@@ -371,32 +371,12 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         bootstrapBusinessCertificate();
 
         if (store.accountStore().clientType() == LinkedWhatsAppClientType.WEB) {
-            Thread.startVirtualThread(() -> {
-                try {
-                    whatsapp.refreshWhatsAppWebGraphQlSession();
-                } catch (WhatsAppWebGraphQlException.SessionUnseeded _) {
-
-                } catch (WhatsAppWebGraphQlException exception) {
-                    if (Log.WARNING) {
-                        LOGGER.log(Level.WARNING,
-                                "whatsapp web graphql credentials auto-refresh failed", exception);
-                    }
-                }
-            });
+            Thread.ofVirtual().name("cobalt-whatsapp-web-graphql-refresh").start(() ->
+                    runCredentialsRefresh("whatsapp web graphql", whatsapp::refreshWhatsAppWebGraphQlSession));
             if (store.accountStore().primaryPlatform().filter(LinkedPrimaryPlatform::isBusiness).isPresent()
                     && store.webSessionStore().facebookGraphQlSession().isEmpty()) {
-                Thread.startVirtualThread(() -> {
-                    try {
-                        whatsapp.refreshFacebookGraphQlSession();
-                    } catch (WhatsAppFacebookGraphQlException.SessionUnseeded _) {
-
-                    } catch (WhatsAppFacebookGraphQlException exception) {
-                        if (Log.WARNING) {
-                            LOGGER.log(Level.WARNING,
-                                    "facebook graphql credentials auto-refresh failed", exception);
-                        }
-                    }
-                });
+                Thread.ofVirtual().name("cobalt-facebook-graphql-refresh").start(() ->
+                        runCredentialsRefresh("facebook graphql", whatsapp::refreshFacebookGraphQlSession));
             }
         }
 
@@ -580,6 +560,30 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * The logger for {@link SuccessStreamHandler}.
      */
     private static final System.Logger LOGGER = Log.get(SuccessStreamHandler.class);
+
+    /**
+     * Runs a background credentials refresh started by the login bootstrap.
+     *
+     * <p>An unseeded session is expected and stays silent; any other runtime failure is logged as a
+     * warning instead of escaping the virtual thread. Before, only the GraphQL exceptions were
+     * caught, so a stanza timeout (the server often leaves the business {@code fb:thrift_iq}
+     * silent-nonce query unanswered) reached the default uncaught-exception handler on every
+     * business login.
+     *
+     * @param name    the credentials name used in the log message
+     * @param refresh the refresh to run
+     */
+    static void runCredentialsRefresh(String name, Runnable refresh) {
+        try {
+            refresh.run();
+        } catch (WhatsAppWebGraphQlException.SessionUnseeded | WhatsAppFacebookGraphQlException.SessionUnseeded _) {
+            // nothing to refresh yet
+        } catch (RuntimeException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, name + " credentials auto-refresh failed", exception);
+            }
+        }
+    }
 
     /**
      * The floor delay between successive media-connection refresh attempts.

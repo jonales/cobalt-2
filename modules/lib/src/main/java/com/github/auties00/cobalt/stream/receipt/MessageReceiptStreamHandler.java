@@ -601,7 +601,10 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
             return;
         }
 
-        var message = findRetryMessage(from, participant, originalId);
+        var account = whatsapp.store().accountStore();
+        var target = retryTargetChat(from, stanza.getAttributeAsJid("recipient").orElse(null),
+                account.jid().orElse(null), account.lid().orElse(null));
+        var message = findRetryMessage(target, participant, originalId);
         if (message == null) {
             emitRetryReject(requester, from, retryCount, null, RetryRejectReason.MESSAGE_NOT_EXIST);
             return;
@@ -650,6 +653,39 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      * @return the resolved {@link LinkedMessageInfo}, or {@code null} when the
      *         message cannot be located in the store
      */
+    /**
+     * Returns the chat in which the message asked for by a retry receipt was sent.
+     *
+     * <p>Mirrors {@code getTargetChat}: a user sender is reduced to its user JID (the receipt comes
+     * from a specific device, while the chat is stored per user), and a retry from another device
+     * of this same account points to the chat named by the {@code recipient} attribute. Group and
+     * broadcast senders are returned as they are.
+     *
+     * @param from      the {@code from} attribute of the receipt
+     * @param recipient the {@code recipient} attribute, or {@code null}
+     * @param selfPn    this account's phone-number JID, or {@code null}
+     * @param selfLid   this account's LID, or {@code null}
+     * @return the chat to search, or {@code null} when it cannot be determined
+     */
+    @WhatsAppWebExport(moduleName = "WAWebHandleRetryRequest",
+            exports = "getTargetChat",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    static Jid retryTargetChat(Jid from, Jid recipient, Jid selfPn, Jid selfLid) {
+        if (from == null) {
+            return null;
+        }
+        if (!from.hasUserServer() && !from.hasLidServer()) {
+            return from;
+        }
+        var user = from.toUserJid();
+        var isSelf = (selfPn != null && Objects.equals(user, selfPn.toUserJid()))
+                || (selfLid != null && Objects.equals(user, selfLid.toUserJid()));
+        if (isSelf) {
+            return recipient == null ? null : recipient.toUserJid();
+        }
+        return user;
+    }
+
     @WhatsAppWebExport(moduleName = "WAWebHandleRetryRequest",
             exports = "getTargetChat",
             adaptation = WhatsAppAdaptation.ADAPTED)
