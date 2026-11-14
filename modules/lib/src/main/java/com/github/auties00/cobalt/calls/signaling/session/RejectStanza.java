@@ -147,7 +147,9 @@ public final class RejectStanza implements CallMessage {
      */
     public static RejectStanza of(String callId, Jid callCreator, CallEndReason reason) {
         Objects.requireNonNull(reason, "reason cannot be null");
-        return new RejectStanza(callId, callCreator, reason, reason.wireValue(), -1);
+        // Como o celular: count="0" e, na recusa comum, sem reason. A recusa com reason e sem count era
+        // aceita pelo servidor e ignorada (quem ligou continuava ouvindo chamar).
+        return new RejectStanza(callId, callCreator, reason, reason.wireValue(), 0);
     }
 
     /**
@@ -179,9 +181,20 @@ public final class RejectStanza implements CallMessage {
     @Override
     public Stanza toStanza() {
         return CallMessages.stampHeader(new StanzaBuilder().description(ELEMENT), callId, callCreator)
-                .attribute(REASON_ATTRIBUTE, reasonWire)
+                .attribute(REASON_ATTRIBUTE, reasonWire, sendsReason(reasonWire))
                 .attribute(COUNT_ATTRIBUTE, count, count >= 0)
                 .build();
+    }
+
+    /**
+     * Whether the reject carries its {@code reason}: a plain decline ({@code rejected}) goes without it, as
+     * the phone sends it; other reasons (busy, for example) keep it.
+     *
+     * @param reasonWire the reason literal, or {@code null}
+     * @return {@code true} when the attribute is sent
+     */
+    static boolean sendsReason(String reasonWire) {
+        return reasonWire != null && !reasonWire.isEmpty() && !"rejected".equals(reasonWire);
     }
 
     /**
