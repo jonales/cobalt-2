@@ -1378,13 +1378,31 @@ public final class LifecycleController {
             // the router instead returns DROP for the now unknown call, so this guards only the race while
             // the rejected handle is still tracked.
             orchestrated.dedupState(orchestrated.dedupState().markRejected());
-            var to = orchestrated.peerDeviceJid().orElse(callCreator.toUserJid());
-            var reject = RejectStanza.of(callId, callCreator, reason);
+            var creator = rejectCreator(orchestrated.call().creator(), callCreator);
+            var to = orchestrated.peerDeviceJid().orElse(creator.toUserJid());
+            var reject = RejectStanza.of(callId, creator, reason);
             host.sendSignaling(CallStanza.toCall(reject, to, callId));
             tearDown(orchestrated, reason, CallEventType.CALL_REJECT_RECEIVED);
         } finally {
             orchestrated.lock().unlock();
         }
+    }
+
+    /**
+     * The {@code call-creator} a reject must carry: the creator of the tracked call, exactly as the offer
+     * addressed it (usually a LID), and only the supplied one when no call is tracked.
+     *
+     * <p>Applications receive the caller as a phone number (the offer handling stamps {@code caller_pn}
+     * on the {@code IncomingCall}), so the JID they pass back to reject is not the one the server knows
+     * the call by. A reject carrying the phone number is accepted on the wire but ignored: the caller's
+     * phone keeps ringing until it times out or another device answers.
+     *
+     * @param tracked  the creator of the tracked call, or {@code null} when none is tracked
+     * @param supplied the creator the application supplied
+     * @return the creator to put on the reject
+     */
+    static Jid rejectCreator(Jid tracked, Jid supplied) {
+        return tracked != null ? tracked : supplied;
     }
 
     /**
