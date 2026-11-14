@@ -18,7 +18,7 @@
 
 <br/>
 
-# C O B A L T
+# C O B A L T - 2
 
 ### Standalone, unofficial, fully-featured WhatsApp Web, Desktop, Mobile and Cloud API for JVM languages
 
