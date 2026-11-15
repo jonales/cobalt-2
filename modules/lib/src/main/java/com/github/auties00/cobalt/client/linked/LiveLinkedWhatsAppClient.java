@@ -2762,8 +2762,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var isIncognito = stanza.hasChild("incognito");
         var defaultSubgroup = stanza.hasAttribute("default_sub_group", true);
         if (communityNode == null) {
-            var restrict = stanza.hasChild("announce");
-            var announce = stanza.hasChild("restrict");
+            // <announcement/>: só admins enviam mensagens; <locked/>: só admins editam os dados do grupo
+            var announce = stanza.hasChild("announcement");
+            var restrict = stanza.hasChild("locked");
             var memberAddModeAdminOnly = stanza.getChild("member_add_mode")
                     .flatMap(Stanza::toContentString)
                     .map(mode -> Objects.equals(mode, "admin_add"))
@@ -15508,6 +15509,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         continue;
                     }
                     if (parseChatMetadata(groupNode) instanceof GroupMetadata metadata) {
+                        store.chatStore().addChatMetadata(metadata);
                         result.add(metadata);
                     }
                 }
@@ -16061,13 +16063,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
+        // Depois de reiniciar, o Store pode não ter os metadados do grupo: busca no servidor em vez de
+        // desistir em silêncio (antes a edição virava no-op e quem chamou achava que tinha dado certo)
         var existing = store.chatStore().findChatMetadata(group)
                 .filter(GroupMetadata.class::isInstance)
                 .map(GroupMetadata.class::cast)
-                .orElse(null);
-        if (existing == null) {
-            return Optional.empty();
-        }
+                .or(() -> queryGroupMetadata(group).stream().findFirst())
+                .orElseThrow(() -> new NoSuchElementException("Group not found: " + group));
         edit.subject().ifPresent(newSubject -> sendGroupSubjectIq(group, newSubject));
         edit.description().ifPresent(intent -> {
             switch (intent) {
