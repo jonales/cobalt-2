@@ -91,7 +91,7 @@ Para compilar uma revisão fixa (como o Msgforge faz em `scripts/install-cobalt.
 
 ### Bibliotecas nativas
 
-Chamadas e mídia usam componentes nativos (FFmpeg, codecs, criptografia). Os binários de todas as plataformas estão versionados neste repositório em `modules/lib/natives/bin/<classifier>/`, mas o jar padrão do `cobalt-lib` não os inclui: no primeiro uso, o carregador baixa o binário da máquina do GitHub do projeto original, no commit registrado em `META-INF/native-checksums.json`, confere o SHA-256 e guarda em `~/.cobalt/cache/natives/`. Use `-Dcobalt.natives.cache=<caminho>` para mudar o cache.
+Chamadas e mídia usam componentes nativos (FFmpeg, codecs, criptografia). Os binários de todas as plataformas estão versionados neste repositório em `modules/lib/natives/bin/<classifier>/`, mas o jar padrão do `cobalt-lib` não os inclui: no primeiro uso, o carregador baixa o binário da máquina deste repositório (`raw.githubusercontent.com/jonales/cobalt-2/<commit>/...`), no commit registrado em `META-INF/native-checksums.json`, confere o SHA-256 e guarda em `~/.cobalt/cache/natives/`. Use `-Dcobalt.natives.cache=<caminho>` para mudar o cache e `-Dcobalt.natives.repo=<url>` para baixar de um espelho com o mesmo formato `<commit>/<caminho>`. O workflow `build-natives` recompila os binários e o manifesto neste repositório, então o commit registrado sempre existe aqui.
 
 Para evitar o download (servidores sem internet, imagens Docker), gere um jar com o nativo incluído, a partir de `modules/lib`:
 

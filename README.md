@@ -91,7 +91,7 @@ To build a fixed revision (as Msgforge does, in `scripts/install-cobalt.sh`), ch
 
 ### Native libraries
 
-Calls and media use native components (FFmpeg, codecs, crypto). The binaries for every platform are versioned in this repository under `modules/lib/natives/bin/<classifier>/`, but the default `cobalt-lib` jar does not include them: on first use the loader downloads the binary for the host from the upstream GitHub repository, at the commit recorded in `META-INF/native-checksums.json`, checks its SHA-256 and caches it under `~/.cobalt/cache/natives/`. Set `-Dcobalt.natives.cache=<path>` to move the cache.
+Calls and media use native components (FFmpeg, codecs, crypto). The binaries for every platform are versioned in this repository under `modules/lib/natives/bin/<classifier>/`, but the default `cobalt-lib` jar does not include them: on first use the loader downloads the binary for the host from this repository (`raw.githubusercontent.com/jonales/cobalt-2/<commit>/...`), at the commit recorded in `META-INF/native-checksums.json`, checks its SHA-256 and caches it under `~/.cobalt/cache/natives/`. Set `-Dcobalt.natives.cache=<path>` to move the cache, and `-Dcobalt.natives.repo=<url>` to download from a mirror that serves the same `<commit>/<path>` layout. The `build-natives` workflow rebuilds the binaries and the manifest in this repository, so the recorded commit always exists here.
 
 To avoid the download (servers without internet access, Docker images), build a jar with the native included, from `modules/lib`:
 
