@@ -555,6 +555,22 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         }
 
         /**
+         * Returns the temp file backing this bridge, while it still owns it.
+         *
+         * <p>The MP4 muxer needs it as its {@code url}: with {@code +faststart}, the trailer reopens
+         * the output by name to move the moov atom to the head of the file.
+         *
+         * @return the temp file path
+         * @throws IllegalStateException if the file has already been released
+         */
+        public Path path() {
+            if (path == null) {
+                throw new IllegalStateException("AvioWriteBuffer.FileSystem already released");
+            }
+            return path;
+        }
+
+        /**
          * Detaches the temp file from this bridge's cleanup and returns its path to the caller.
          *
          * <p>Invoked by the owning pipeline after {@code av_write_trailer} completes successfully.
