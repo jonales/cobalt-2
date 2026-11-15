@@ -2762,8 +2762,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var isIncognito = stanza.hasChild("incognito");
         var defaultSubgroup = stanza.hasAttribute("default_sub_group", true);
         if (communityNode == null) {
-            var restrict = stanza.hasChild("announce");
-            var announce = stanza.hasChild("restrict");
+            // <announcement/>: só admins enviam mensagens; <locked/>: só admins editam os dados do grupo
+            var announce = stanza.hasChild("announcement");
+            var restrict = stanza.hasChild("locked");
             var memberAddModeAdminOnly = stanza.getChild("member_add_mode")
                     .flatMap(Stanza::toContentString)
                     .map(mode -> Objects.equals(mode, "admin_add"))
