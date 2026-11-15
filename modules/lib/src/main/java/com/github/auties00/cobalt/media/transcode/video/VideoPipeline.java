@@ -53,6 +53,11 @@ import java.nio.file.Path;
  * matrix.
  */
 public final class VideoPipeline {
+    /** {@code AV_PROFILE_H264_CONSTRAINED_BASELINE}: 66 com a marca de "constrained" (1 << 9). */
+    private static final int H264_PROFILE_CONSTRAINED_BASELINE = 66 | (1 << 9);
+    /** Nível 3.1, no formato inteiro do FFmpeg (31). */
+    private static final int H264_LEVEL_3_1 = 31;
+
     /** The logger for {@link VideoPipeline}. */
     private static final System.Logger LOGGER = Log.get(VideoPipeline.class);
 
@@ -590,6 +595,11 @@ public final class VideoPipeline {
             outFmtCtx = fmtCtxPp.get(ValueLayout.ADDRESS, 0L)
                     .reinterpret(AVFormatContext.layout().byteSize());
             AVFormatContext.pb(outFmtCtx, outputBridge.ioContext());
+            // O +faststart reabre a saída pelo nome no av_write_trailer, para mover o moov para o
+            // começo: sem url, falhava com "No such file or directory". O avformat_free_context
+            // libera o url com av_free, então ele precisa vir do av_strdup.
+            AVFormatContext.url(outFmtCtx, FFmpegError.requireNonNull("av_strdup(url)",
+                    Ffmpeg.av_strdup(arena.allocateFrom(outputBridge.path().toString()))));
             var priv = AVFormatContext.priv_data(outFmtCtx);
             if (priv != null && priv != MemorySegment.NULL) {
                 FFmpegError.check("av_opt_set(movflags=+faststart)",
@@ -657,16 +667,10 @@ public final class VideoPipeline {
                 AVCodecContext.flags(videoEncCtx,
                         AVCodecContext.flags(videoEncCtx) | Ffmpeg.AV_CODEC_FLAG_GLOBAL_HEADER());
             }
-            FFmpegError.check("av_opt_set(profile=baseline)",
-                    Ffmpeg.av_opt_set(videoEncCtx,
-                            arena.allocateFrom("profile"),
-                            arena.allocateFrom("baseline"),
-                            Ffmpeg.AV_OPT_SEARCH_CHILDREN()));
-            FFmpegError.check("av_opt_set(level=3.1)",
-                    Ffmpeg.av_opt_set(videoEncCtx,
-                            arena.allocateFrom("level"),
-                            arena.allocateFrom("3.1"),
-                            Ffmpeg.AV_OPT_SEARCH_CHILDREN()));
+            // O libopenh264 lê o perfil e o nível como inteiros do contexto: pelo nome ("baseline",
+            // "3.1"), o av_opt_set devolvia "Invalid argument" e nenhum vídeo era enviado.
+            AVCodecContext.profile(videoEncCtx, H264_PROFILE_CONSTRAINED_BASELINE);
+            AVCodecContext.level(videoEncCtx, H264_LEVEL_3_1);
             FFmpegError.check("avcodec_open2(libopenh264)",
                     Ffmpeg.avcodec_open2(videoEncCtx, encoder, MemorySegment.NULL));
             var stream = FFmpegError.requireNonNull("avformat_new_stream(video)",
@@ -1286,6 +1290,13 @@ public final class VideoPipeline {
                 tb.set(ValueLayout.JAVA_INT, 0L, 1);
                 tb.set(ValueLayout.JAVA_INT, 4L, 1);
                 AVCodecContext.time_base(ctx, tb);
+                // O mjpeg só escreve o cabeçalho JFIF (APP0) com uma proporção de pixel definida; sem
+                // ele, o JpegCleaner recusa a miniatura ("Missing magic bytes marker"). O quadro vem
+                // do decodificador do vídeo, que costuma deixar a proporção indefinida (0/1).
+                var sar = local.allocate(8);
+                sar.set(ValueLayout.JAVA_INT, 0L, 1);
+                sar.set(ValueLayout.JAVA_INT, 4L, 1);
+                AVCodecContext.sample_aspect_ratio(ctx, sar);
                 AVCodecContext.flags(ctx,
                         AVCodecContext.flags(ctx) | Ffmpeg.AV_CODEC_FLAG_QSCALE());
                 AVCodecContext.global_quality(ctx, THUMB_QSCALE * Ffmpeg.FF_QP2LAMBDA());
