@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.util;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -138,6 +139,28 @@ public class NativeLibLoaderTest {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("failed to read fixture: " + resourcePath, e);
+        }
+    }
+
+    @Test
+    @DisplayName("downloads natives from jonales/cobalt-2 by default and honours -Dcobalt.natives.repo")
+    void repoBase() {
+        var previous = System.getProperty("cobalt.natives.repo");
+        try {
+            System.clearProperty("cobalt.natives.repo");
+            assertEquals("https://raw.githubusercontent.com/jonales/cobalt-2/", NativeLibLoader.repoBase());
+            System.setProperty("cobalt.natives.repo", "  ");
+            assertEquals("https://raw.githubusercontent.com/jonales/cobalt-2/", NativeLibLoader.repoBase());
+            System.setProperty("cobalt.natives.repo", "https://mirror.example/natives");
+            assertEquals("https://mirror.example/natives/", NativeLibLoader.repoBase());
+            System.setProperty("cobalt.natives.repo", "https://mirror.example/natives/");
+            assertEquals("https://mirror.example/natives/", NativeLibLoader.repoBase());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("cobalt.natives.repo");
+            } else {
+                System.setProperty("cobalt.natives.repo", previous);
+            }
         }
     }
 }

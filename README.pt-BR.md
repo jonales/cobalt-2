@@ -35,7 +35,7 @@ O **cobalt-2** é uma continuação independente do [Cobalt][upstream], a biblio
 O que muda em relação ao original:
 
 - **Correções achadas em testes ao vivo.** A maior parte do trabalho aqui vem de rodar o Msgforge com celulares de verdade: reenvio de mensagem (retry), recusa de chamada, metadados de grupo, envio de vídeo e de nota de voz, lista de aparelhos e o aviso de código de segurança (ICDC), sessões Signal pelo LID, entre outras. O estado de cada item fica em [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), e o que ainda precisa de celular está em [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
-- **Sem versão no Maven Central.** O fork mantém as coordenadas do original (`com.github.auties00:cobalt-lib:0.1.0`), mas não é publicado em lugar nenhum; você compila a partir do código (veja [Instalação](#instalação)).
+- **Sem versão no Maven Central.** O fork é servido pelo JitPack a partir deste repositório (veja [Instalação](#instalação)).
 - **Issues separadas.** Problemas deste fork vão para este repositório, não para o original.
 
 O crédito pelo desenho e pela maior parte do código é do projeto original. Este fork não fala em nome dele.
@@ -61,7 +61,43 @@ O Cobalt faz de uma aplicação JVM um cliente de WhatsApp. Ele tem dois jeitos 
 
 ## Instalação
 
-O Cobalt usa **Java 25** e é compilado com Maven. Como este fork não é publicado, instale no seu repositório Maven local:
+O Cobalt usa **Java 25**. Este fork não está no Maven Central; ele é servido pelo [JitPack](https://jitpack.io/#jonales/cobalt-2), que o compila a partir deste repositório no primeiro pedido de cada versão (o primeiro download pode levar alguns minutos; os seguintes vêm do cache).
+
+**Maven**
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.jonales.cobalt-2</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>COMMIT_OU_TAG</version>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven("https://jitpack.io")
+}
+
+dependencies {
+    implementation("com.github.jonales.cobalt-2:cobalt-lib:COMMIT_OU_TAG")
+}
+```
+
+Troque `COMMIT_OU_TAG` por uma tag de versão, pelo hash curto de um commit do `master` (qualquer commit a partir do que adicionou o `jitpack.yml`) ou por `master-SNAPSHOT` para o commit mais recente. Em produção, fixe uma tag ou um commit: `master-SNAPSHOT` muda sem aviso. A receita de build que o JitPack roda é o [`jitpack.yml`](jitpack.yml).
+
+### Compilar a partir do código
+
+Para trabalhar no motor, ou sem acesso ao JitPack, instale no seu repositório Maven local:
 
 ```bash
 git clone https://github.com/jonales/cobalt-2.git
@@ -69,29 +105,11 @@ cd cobalt-2
 mvn -DskipTests install -pl modules/lib -am
 ```
 
-Depois declare a dependência normalmente.
-
-**Maven**
-
-```xml
-<dependency>
-    <groupId>com.github.auties00</groupId>
-    <artifactId>cobalt-lib</artifactId>
-    <version>0.1.0</version>
-</dependency>
-```
-
-**Gradle (Kotlin DSL)** (precisa de `mavenLocal()` em `repositories`)
-
-```kotlin
-implementation("com.github.auties00:cobalt-lib:0.1.0")
-```
-
-Para compilar uma revisão fixa (como o Msgforge faz em `scripts/install-cobalt.sh`), faça checkout do commit desejado antes do `mvn install`.
+A instalação local mantém as coordenadas do `pom.xml`, `com.github.auties00:cobalt-lib:0.1.0` (herdadas do original), resolvidas pelo `mavenLocal()`. Para compilar uma revisão fixa (como o Msgforge faz em `scripts/install-cobalt.sh`), faça checkout do commit desejado antes do `mvn install`.
 
 ### Bibliotecas nativas
 
-Chamadas e mídia usam componentes nativos (FFmpeg, codecs, criptografia). Os binários de todas as plataformas estão versionados neste repositório em `modules/lib/natives/bin/<classifier>/`, mas o jar padrão do `cobalt-lib` não os inclui: no primeiro uso, o carregador baixa o binário da máquina do GitHub do projeto original, no commit registrado em `META-INF/native-checksums.json`, confere o SHA-256 e guarda em `~/.cobalt/cache/natives/`. Use `-Dcobalt.natives.cache=<caminho>` para mudar o cache.
+Chamadas e mídia usam componentes nativos (FFmpeg, codecs, criptografia). Os binários de todas as plataformas estão versionados neste repositório em `modules/lib/natives/bin/<classifier>/`, mas o jar padrão do `cobalt-lib` não os inclui: no primeiro uso, o carregador baixa o binário da máquina deste repositório (`raw.githubusercontent.com/jonales/cobalt-2/<commit>/...`), no commit registrado em `META-INF/native-checksums.json`, confere o SHA-256 e guarda em `~/.cobalt/cache/natives/`. Use `-Dcobalt.natives.cache=<caminho>` para mudar o cache e `-Dcobalt.natives.repo=<url>` para baixar de um espelho com o mesmo formato `<commit>/<caminho>`. O workflow `build-natives` recompila os binários e o manifesto neste repositório, então o commit registrado sempre existe aqui.
 
 Para evitar o download (servidores sem internet, imagens Docker), gere um jar com o nativo incluído, a partir de `modules/lib`:
 

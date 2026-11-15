@@ -44,9 +44,10 @@
             Native-bundle JARs — opt-in per-classifier artifacts for
             consumers that don't want the runtime download. The
             default `cobalt` artifact ships no binaries; the loader
-            fetches them from Github on first use, verifies the SHA-256 against the bundled
+            fetches them from jonales/cobalt-2 on GitHub on first use (or from the
+            -Dcobalt.natives.repo mirror), verifies the SHA-256 against the bundled
             META-INF/native-checksums.json manifest, and caches the
-            result under ${user.home}/.cobalt/natives/.
+            result under ${user.home}/.cobalt/cache/natives/.
 
             Activated by `-Pnatives` plus one of the
             `-Dnatives.classifier=` values:

@@ -7,7 +7,7 @@
     <packaging>pom</packaging>
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Standalone fully-featured WhatsApp Web API for Java and Kotlin</description>
-    <url>https://github.com/Auties00/Cobalt</url>
+    <url>https://github.com/jonales/cobalt-2</url>
 
     <modules>
         <module>modules/wam-core</module>
@@ -34,9 +34,9 @@
     </licenses>
 
     <scm>
-        <url>https://github.com/Auties00/Cobalt/tree/master</url>
-        <connection>scm:git:https://github.com/Auties00/Cobalt.git</connection>
-        <developerConnection>scm:ssh:https://github.com/Auties00/Cobalt.git</developerConnection>
+        <url>https://github.com/jonales/cobalt-2/tree/master</url>
+        <connection>scm:git:https://github.com/jonales/cobalt-2.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/jonales/cobalt-2.git</developerConnection>
     </scm>
 
     <distributionManagement>
