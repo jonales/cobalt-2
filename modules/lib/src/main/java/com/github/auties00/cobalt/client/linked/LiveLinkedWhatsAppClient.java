@@ -15509,6 +15509,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         continue;
                     }
                     if (parseChatMetadata(groupNode) instanceof GroupMetadata metadata) {
+                        store.chatStore().addChatMetadata(metadata);
                         result.add(metadata);
                     }
                 }
@@ -16062,13 +16063,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
+        // Depois de reiniciar, o Store pode não ter os metadados do grupo: busca no servidor em vez de
+        // desistir em silêncio (antes a edição virava no-op e quem chamou achava que tinha dado certo)
         var existing = store.chatStore().findChatMetadata(group)
                 .filter(GroupMetadata.class::isInstance)
                 .map(GroupMetadata.class::cast)
-                .orElse(null);
-        if (existing == null) {
-            return Optional.empty();
-        }
+                .or(() -> queryGroupMetadata(group).stream().findFirst())
+                .orElseThrow(() -> new NoSuchElementException("Group not found: " + group));
         edit.subject().ifPresent(newSubject -> sendGroupSubjectIq(group, newSubject));
         edit.description().ifPresent(intent -> {
             switch (intent) {
