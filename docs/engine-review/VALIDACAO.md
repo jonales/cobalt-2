@@ -1,6 +1,6 @@
 # Validação ao vivo do motor (fork)
 
-O que validar com celulares de verdade, e como, depois das correções do PR jonales/Cobalt#2.
+O que validar com celulares de verdade, e como, depois das correções do motor (a partir de jonales/Cobalt#2).
 Não roda na nuvem: o proxy bloqueia o WhatsApp. Resultados voltam para `STATUS.md`.
 
 ## Caminho recomendado: pela API (msgforge-api)
@@ -15,8 +15,8 @@ este fork no commit fixado em `msgforge-api/scripts/install-cobalt.sh`.
 Para isolar o motor, sem API nem Docker (precisa de JDK 25 e Maven):
 
 ```bash
-git clone https://github.com/jonales/Cobalt.git && cd Cobalt
-git checkout claude/elegant-faraday-6i4y7z
+git clone https://github.com/jonales/cobalt-2.git && cd cobalt-2
+git checkout master
 mvn -DskipTests -Dmaven.javadoc.skip=true install -pl modules/lib -am
 
 cd ../msgforge-api/docs/spikes/cobalt-0.1
@@ -34,6 +34,14 @@ Use a tabela "O que observar" do `README.md` do spike.
 | Envio depois de B responder sai `enc type=msg` (não `pkmsg`) | log `DEBUG` da API (`...COBALT_WIRE=DEBUG`) | 2.6 |
 | Ack do envio sem `phash` depois do primeiro reenvio | mesmo log (`ack{...}` sem `phash`) | 2.1 |
 | Status entregue/lida chegam | Manager ou `findMessages` da API | (regressão) |
+
+## Pendências dos PRs #1 a #4 do cobalt-2
+
+| Teste | Como ver | Item do STATUS.md |
+|---|---|---|
+| Enviar vídeo (MP4 e um formato que precise transcodificar) de A para B | o vídeo toca no celular B, com miniatura, e começa antes de baixar inteiro | 3.7 |
+| Consultar um grupo novo pela MEX (`queryGroupInfo`) | announce/restrict devem sair `false` e o criador como admin; guarde o JSON da resposta | 3.6 |
+| Retry: se aparecer `receipt type=retry` no log | a mensagem é reenviada (sem `MESSAGE_NOT_EXIST`) | 3.1 |
 
 ## Se der errado
 
