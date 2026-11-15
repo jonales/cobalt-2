@@ -1,0 +1,9 @@
+# JitPack builds cobalt-2 from source when a version is first requested
+# (https://jitpack.io/#jonales/cobalt-2) and serves the modules as
+# com.github.jonales.cobalt-2:<artifactId>:<tag or commit>.
+# JitPack's default JDK predates Java 25, so the build fetches the latest Temurin 25 first.
+before_install:
+  - curl -fsSL -o /tmp/jdk25.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse"
+  - mkdir -p "$HOME/jdk25" && tar -xzf /tmp/jdk25.tar.gz -C "$HOME/jdk25" --strip-components=1
+install:
+  - export JAVA_HOME="$HOME/jdk25" PATH="$HOME/jdk25/bin:$PATH" && java -version && sh ./mvnw -B -DskipTests -Dmaven.javadoc.skip=true install -pl modules/lib -am

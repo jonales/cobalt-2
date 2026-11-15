@@ -35,7 +35,7 @@
 What changes compared with upstream:
 
 - **Fixes found in live tests.** Most of the work here comes from running Msgforge against real phones: message retry, call rejection, group metadata, video and voice-note sending, device lists and the security-code (ICDC) warning, Signal sessions addressed by LID, and others. The state of each item is tracked in [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), and what still needs a real phone is listed in [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
-- **No Maven Central release.** The fork keeps upstream's coordinates (`com.github.auties00:cobalt-lib:0.1.0`) but is not published anywhere; you build it from source (see [Install](#install)).
+- **No Maven Central release.** The fork is served by JitPack from this repository (see [Install](#install)).
 - **Separate issue tracker.** Report problems with this fork here, not on the upstream repository.
 
 Credit for the design and for most of the code belongs to the upstream project. This fork does not speak for it.
@@ -61,7 +61,43 @@ Cobalt lets a JVM application be a WhatsApp client. It supports two completely d
 
 ## Install
 
-Cobalt targets **Java 25** and is built with Maven. Since this fork is not published, install it into your local Maven repository:
+Cobalt targets **Java 25**. This fork is not on Maven Central; it is served by [JitPack](https://jitpack.io/#jonales/cobalt-2), which builds it from this repository on the first request for a version (the first download can take a few minutes; later ones are cached).
+
+**Maven**
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.jonales.cobalt-2</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>COMMIT_OR_TAG</version>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven("https://jitpack.io")
+}
+
+dependencies {
+    implementation("com.github.jonales.cobalt-2:cobalt-lib:COMMIT_OR_TAG")
+}
+```
+
+Replace `COMMIT_OR_TAG` with a release tag, the short hash of a commit on `master` (any commit from the one that added `jitpack.yml` onward), or `master-SNAPSHOT` for the latest commit. Pin a tag or a commit in production: `master-SNAPSHOT` changes under you. The build recipe JitPack runs is [`jitpack.yml`](jitpack.yml).
+
+### Build from source
+
+To work on the engine, or without access to JitPack, install it into your local Maven repository:
 
 ```bash
 git clone https://github.com/jonales/cobalt-2.git
@@ -69,25 +105,7 @@ cd cobalt-2
 mvn -DskipTests install -pl modules/lib -am
 ```
 
-Then depend on it as usual.
-
-**Maven**
-
-```xml
-<dependency>
-    <groupId>com.github.auties00</groupId>
-    <artifactId>cobalt-lib</artifactId>
-    <version>0.1.0</version>
-</dependency>
-```
-
-**Gradle (Kotlin DSL)** (needs `mavenLocal()` in `repositories`)
-
-```kotlin
-implementation("com.github.auties00:cobalt-lib:0.1.0")
-```
-
-To build a fixed revision (as Msgforge does, in `scripts/install-cobalt.sh`), check out the commit you want before `mvn install`.
+A local install keeps the coordinates of the `pom.xml`, `com.github.auties00:cobalt-lib:0.1.0` (inherited from upstream), resolved from `mavenLocal()`. To build a fixed revision (as Msgforge does, in `scripts/install-cobalt.sh`), check out the commit you want before `mvn install`.
 
 ### Native libraries
 
