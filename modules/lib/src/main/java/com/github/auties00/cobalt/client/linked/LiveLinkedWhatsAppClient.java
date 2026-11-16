@@ -2232,6 +2232,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             return;
         }
         dispatchUnpairDevice(localJid.get());
+        // Como o WAWebSocketLogoutUtils: desvinculado, o socket fecha na hora. Antes ele ficava aberto
+        // até o servidor derrubar (~47 s ao vivo), e o celular seguia mostrando o aparelho conectado.
+        disconnect(WhatsAppClientDisconnectReason.LOGGED_OUT);
     }
 
     /** {@inheritDoc} */
