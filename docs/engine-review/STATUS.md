@@ -1,10 +1,10 @@
-# Revisão do motor Cobalt: ledger de posição e validação
+# Revisão do motor cobalt-2: ledger de posição e validação
 
-Fonte única de "onde estamos" na revisão/refatoração do fork. Cada item tem estado,
+Fonte única de "onde estamos" na revisão/refatoração do motor. Cada item tem estado,
 evidência (arquivo:linha, teste ou consulta ao grafo) e próximo passo. Atualize este
 arquivo e registre a memória Graphify correspondente a cada achado.
 
-- Repositório: `jonales/cobalt-2`, continuação do fork `jonales/Cobalt` (base `3a53a668`, 2026-11-12). Os números de PR abaixo são do `cobalt-2`, salvo quando indicado `jonales/Cobalt#N`.
+- Repositório: `jonales/cobalt-2` (base `3a53a668`, 2026-11-12, vinda do repositório arquivado `jonales/Cobalt`). Os números de PR abaixo são do `cobalt-2`, salvo quando indicado `jonales/Cobalt#N`.
 - Build: Java 25 (`openjdk-25-jdk-headless`), `mvn -DskipTests install -pl modules/lib -am` OK
 - Grafo: `graphify update modules` -> `modules/graphify-out/` (83k nós, 221k arestas; `graph.json` não versionado)
 - **Validação ao vivo pendente: roteiro em `docs/engine-review/VALIDACAO.md`.**
@@ -21,13 +21,13 @@ arquivo e registre a memória Graphify correspondente a cada achado.
 
 ## Referência de comparação
 
-Os testes do usuário compararam o Cobalt com o **whatsmeow** (Go), que não apresentou os sintomas. O whatsmeow faz um bootstrap mínimo após o login; o Cobalt replica o bootstrap completo do WA Web (AB-props, privacidade, probes, sync de app-state), o que por definição é mais lento até o evento de login.
+Os testes do usuário compararam o motor com o **whatsmeow** (Go), que não apresentou os sintomas. O whatsmeow faz um bootstrap mínimo após o login; o cobalt-2 replica o bootstrap completo do WA Web (AB-props, privacidade, probes, sync de app-state), o que por definição é mais lento até o evento de login.
 
 ## Relação com a API (`jonales/msgforge-api`)
 
-- A API usava `it.auties00:cobalt:0.0.10` (Maven Central) e migrou para o fork em jonales/msgforge-api#12; a imagem Docker instala o motor no commit fixado em `msgforge-api/scripts/install-cobalt.sh`. Uma correção daqui só chega à API depois que esse commit é atualizado.
+- A API usava `it.auties00:cobalt:0.0.10` (Maven Central) e migrou para o cobalt-2 em jonales/msgforge-api#12; a imagem Docker instala o motor no commit fixado em `msgforge-api/scripts/install-cobalt.sh`. Uma correção daqui só chega à API depois que esse commit é atualizado.
 - Na 0.0.10 o login leva cerca de 60 s por causa de um timeout de IQ (`erro em LOGIN: Node timed out`), registrado nas memórias da API.
-- O spike `docs/spikes/cobalt-0.1` da API é o teste de aceitação do fork: código de segurança, tempo de login, status, LID, nono dígito, envio repetido, sessão restaurada.
+- O spike `docs/spikes/cobalt-0.1` da API é o teste de aceitação do motor: código de segurança, tempo de login, status, LID, nono dígito, envio repetido, sessão restaurada.
 
 ## Sintoma 1: conexão lenta com o WhatsApp
 
@@ -40,7 +40,7 @@ Os testes do usuário compararam o Cobalt com o **whatsmeow** (Go), que não apr
 
 ## Sintoma 2: "Não foi possível confirmar seu código de segurança" a cada mensagem enviada
 
-Texto real do aviso (registrado no `msgforge-api`, `docs/spikes/cobalt-0.1/README.md`): aparece no celular de quem **recebe**, em toda mensagem, com a API rodando o **Cobalt 0.0.10 do Maven Central**, não este fork. O aviso vem da verificação ICDC: o destinatário compara o `deviceListMetadata` (hash das chaves e timestamp da lista de aparelhos de quem envia) com a lista que ele conhece. O fork calcula e envia o ICDC (`IcdcComputer`, `IcdcEnricher`, `MessageSender.encryptForDevices`); a validação ao vivo (teste 1 do spike) ainda está pendente.
+Texto real do aviso (registrado no `msgforge-api`, `docs/spikes/cobalt-0.1/README.md`): aparece no celular de quem **recebe**, em toda mensagem, com a API rodando a **versão antiga 0.0.10, do Maven Central**, não o cobalt-2. O aviso vem da verificação ICDC: o destinatário compara o `deviceListMetadata` (hash das chaves e timestamp da lista de aparelhos de quem envia) com a lista que ele conhece. O fork calcula e envia o ICDC (`IcdcComputer`, `IcdcEnricher`, `MessageSender.encryptForDevices`); a validação ao vivo (teste 1 do spike) ainda está pendente.
 
 | # | Área | Estado | Evidência | Próximo passo |
 |---|---|---|---|---|
@@ -48,7 +48,7 @@ Texto real do aviso (registrado no `msgforge-api`, `docs/spikes/cobalt-0.1/READM
 | 2.2 | Lote usync com falha sobrescrevia a lista em cache com "só primário" (perdia companions) | CORRIGIDO | `device/LiveDeviceService.java` `fetchDeviceListsFromServer` (loop de fallback) | Nada |
 | 2.3 | `refresh_lid="true"` no ack chama `getDeviceLists(..., null, ...)`, que é no-op quando o usuário já está em cache | PENDENTE | `message/send/UserMessageSender.java` `maybeRefreshLid` | Forçar usync (mesma técnica de 2.1) após confirmar o fluxo `syncContactListJob` no WA Web |
 | 2.5 | Sessão recriada a cada execução (novo pareamento) | DESCARTADO | Builder: `createConnection()` sempre cria sessão nova; `loadLatestOrCreateConnection()` / `registered()` reusam. `WhatsAppStoreFactory.temporary()` não persiste nada. O `msgforge-api` restaura a sessão do Postgres com `registered()` (`CobaltWhatsAppGateway.start`) | Nada |
-| 2.6 | Com a 0.0.10, **toda** mensagem saía como `pkmsg` (sessão Signal nunca se fixava; a API registrou isso ao vivo) | HIPÓTESE | No fork, a sessão fica no `SignalStore` e o `encryptForDevice` só cai para PreKey sem sessão; precisa confirmar ao vivo | Teste "pkmsg x msg" de `VALIDACAO.md` |
+| 2.6 | Com a 0.0.10, **toda** mensagem saía como `pkmsg` (sessão Signal nunca se fixava; a API registrou isso ao vivo) | HIPÓTESE | No cobalt-2, a sessão fica no `SignalStore` e o `encryptForDevice` só cai para PreKey sem sessão; precisa confirmar ao vivo | Teste "pkmsg x msg" de `VALIDACAO.md` |
 | 2.4 | ICDC do remetente calculado sobre a própria lista de aparelhos em cache; se ela não tiver o companion atual, o hash não confere no destinatário | HIPÓTESE | `IcdcComputer.compute` usa `findDeviceList(self)`; a correção 2.1 refaz essa lista quando o ack traz `phash` | Teste 1 do spike `msgforge-api/docs/spikes/cobalt-0.1` com este branch instalado |
 
 ## Correções dos testes ao vivo do Msgforge (2026-11-13 a 2026-11-15)
@@ -63,7 +63,7 @@ Achados ao rodar o Msgforge com duas contas reais. Detalhes, causa e testes est�
 | 3.4 | `parseChatMetadata` (w:g2) lia `<announce/>`/`<restrict/>` (e trocados); o servidor manda `<announcement/>`/`<locked/>` | VALIDADO | PR #3; validado ao vivo depois de reiniciar o processo | Nada |
 | 3.5 | `editGroupMetadata` sem os metadados no Store (normal depois de reiniciar) não mandava nada | VALIDADO | PR #3; agora busca por `queryGroupMetadata` (que passa a gravar no Store) e lança `NoSuchElementException` se o grupo não existir | Nada |
 | 3.6 | Consulta MEX `queryGroupInfo` -> `mapFetchGroupInfoToMetadata`: announce/restrict saem `true` num grupo novo e nenhum participante sai como admin | PENDENTE | PR #3 (em aberto): `announcement`/`locked` são strings tratadas como presente = true; `edges.role` não casa com `GroupPartipantRole` | Capturar o JSON real da resposta MEX e corrigir o mapeamento; até lá o Msgforge usa o w:g2 |
-| 3.7 | Envio de vídeo falhava: perfil/nível H.264 passados por nome ao libopenh264 (EINVAL), `+faststart` sem caminho para reabrir a saída (ENOENT), miniatura sem cabeçalho JFIF (proporção de pixel 0/1) | CORRIGIDO | PR #4; teste `VideoPipelineEncoderTest` (fixture de 13 KB, confere duração, dimensões, miniatura JPEG e `moov` antes de `mdat`) | Validar ao vivo: envio de vídeo entre dois números (`VALIDACAO.md`) |
+| 3.7 | Envio de vídeo falhava: perfil/nível H.264 passados por nome ao libopenh264 (EINVAL), `+faststart` sem caminho para reabrir a saída (ENOENT), miniatura sem cabeçalho JFIF (proporção de pixel 0/1) | CORRIGIDO | PR #4; teste `VideoPipelineEncoderTest` (fixture de 13 KB, confere duração, dimensões, miniatura JPEG e `moov` antes de `mdat`); validado ao vivo em 2026-11-15 (MP4 H.264 de 5 s pela API da Msgforge: chegou com miniatura, duração e som) | Validar ao vivo: envio de vídeo entre dois números (`VALIDACAO.md`) |
 
 Correções anteriores, de jonales/Cobalt#3 e jonales/Cobalt#4, registradas só pelos commits (sem descrição de validação neste ledger):
 
