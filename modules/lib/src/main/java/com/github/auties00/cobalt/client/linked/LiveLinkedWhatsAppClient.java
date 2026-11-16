@@ -434,7 +434,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * Square pixel size (width and height) of the self-profile preview
      * thumbnail WA Web generates for uploads.
      */
-    private static final int PROFILE_PREVIEW_SIZE = 96;
 
     /**
      * WA Web storefront default for the {@code item_limit} argument on
@@ -8092,13 +8091,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         } catch (IOException exception) {
             throw new UncheckedIOException("Failed to read profile picture stream", exception);
         }
-        var selfJid = store.accountStore().jid()
-                .map(Jid::withoutData)
-                .orElseThrow(() -> new IllegalStateException("Missing self JID"));
-        var thumbBytes = generatePreviewThumbnail(jpegBytes);
-        var request = new IqSendProfilePictureRequest(selfJid,
-                SizedInputStream.of(jpegBytes), SizedInputStream.of(thumbBytes));
-        sendNode(request.toStanza());
+        // Como o WAWebSendProfilePictureJob: a foto da própria conta vai sem "target" (o atributo só
+        // existe para grupo) e só com <picture type="image">. Com target = o próprio número e uma
+        // <picture type="preview">, o servidor não respondia e a chamada esperava até estourar.
+        var request = new IqSendProfilePictureRequest(null, SizedInputStream.of(jpegBytes));
+        var requestBuilder = request.toStanza();
+        var response = sendNode(requestBuilder);
+        switch (IqSendProfilePictureResponse.of(response, requestBuilder.build()).orElse(null)) {
+            case null -> {
+                // resposta sem formato conhecido: o servidor aceitou o iq
+            }
+            case IqSendProfilePictureResponse.Success _ -> {
+                // foto trocada
+            }
+            case IqSendProfilePictureResponse.ClientError clientError ->
+                    throw new WhatsAppServerRuntimeException("Edit profile picture rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
+            case IqSendProfilePictureResponse.ServerError serverError ->
+                    throw new WhatsAppServerRuntimeException("Edit profile picture server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
+        }
     }
 
     /** {@inheritDoc} */
@@ -8108,10 +8118,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebContactProfilePicThumbBridge", exports = "requestDeletePicture",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void removeProfilePicture() {
-        var selfJid = store.accountStore().jid()
-                .map(Jid::withoutData)
-                .orElseThrow(() -> new IllegalStateException("Missing self JID"));
-        var request = new IqSendProfilePictureRequest(selfJid, null);
+        // Sem "target", como na troca: o atributo só existe para grupo
+        var request = new IqSendProfilePictureRequest(null, null);
         var requestBuilder = request.toStanza();
         var response = sendNode(requestBuilder);
         var parsed = IqSendProfilePictureResponse.of(response, requestBuilder.build()).orElse(null);
@@ -8126,41 +8134,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                     throw new WhatsAppServerRuntimeException("Remove profile picture rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
             case IqSendProfilePictureResponse.ServerError serverError ->
                     throw new WhatsAppServerRuntimeException("Remove profile picture server error: code=" + serverError.errorCode() + ", text=" + serverError.errorText().orElse(null));
-        }
-    }
-
-    /**
-     * Generates a square-ish preview thumbnail for the given JPEG bytes.
-     *
-     * <p>WA Web computes thumbnails client-side through the browser's
-     * {@code Canvas} API with a nominal 96x96 target. Cobalt uses the
-     * JDK's {@code javax.imageio} pipeline to produce an equivalent
-     * payload sized for WhatsApp's server preview slot.
-     *
-     * @param jpegBytes the full-size JPEG payload
-     * @return the preview JPEG bytes
-     * @throws IllegalArgumentException if the input cannot be decoded as
-     *                                  an image
-     */
-    private byte[] generatePreviewThumbnail(byte[] jpegBytes) {
-        try {
-            var src = ImageIO.read(new ByteArrayInputStream(jpegBytes));
-            if (src == null) {
-                throw new IllegalArgumentException("Invalid image payload");
-            }
-            var thumb = new BufferedImage(PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, BufferedImage.TYPE_INT_RGB); // WA Web's profile preview size
-            var g = thumb.createGraphics();
-            try {
-                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g.drawImage(src, 0, 0, PROFILE_PREVIEW_SIZE, PROFILE_PREVIEW_SIZE, null);
-            } finally {
-                g.dispose();
-            }
-            var out = new ByteArrayOutputStream();
-            ImageIO.write(thumb, "jpg", out);
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to decode profile picture", e);
         }
     }
 
