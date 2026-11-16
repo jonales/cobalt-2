@@ -49,3 +49,10 @@ Guarde o log do trecho (só nomes e atributos dos nós, nunca conteúdo) e anote
 Com isso, a próxima sessão do Claude compara com o caminho de envio do motor
 (`MessageSender.encryptForDevices`, `MessageEncryption.encryptForDevice`, `IcdcComputer`) e com o
 `LiveDeviceService.getDeviceLists`. Registre o achado em `STATUS.md` e numa memória Graphify.
+
+## Rodada de 2026-11-15 (Msgforge, duas contas)
+
+Validados: vídeo (3.7), foto da própria conta (3.8), status de contato com "visto" automático
+(3.9) e logout fechando a conexão (3.10). Falta: remover a foto da conta, um vídeo que precise
+transcodificar, a consulta MEX de grupo (3.6) e o retry observado ao vivo (3.1).
+

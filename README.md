@@ -31,7 +31,7 @@
 released from this repository. All fixes, validation and releases happen here; report problems in
 this repository's issue tracker.
 
-- **Fixes found in live tests.** Most of the work comes from running Msgforge against real phones: message retry, call rejection, group metadata, video and voice-note sending, device lists and the security-code (ICDC) warning, Signal sessions addressed by LID, and others. The state of each item is tracked in [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), and what still needs a real phone is listed in [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
+- **Fixes found in live tests.** Most of the work comes from running Msgforge against real phones: message retry, call rejection, group metadata, video and voice-note sending, own profile picture, contact statuses, logout that closes the connection, device lists and the security-code (ICDC) warning, Signal sessions addressed by LID, and others. The state of each item is tracked in [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), and what still needs a real phone is listed in [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
 - **Served by JitPack.** There is no Maven Central release (see [Install](#install)).
 
 cobalt-2 derives from the Cobalt library by Alessandro Autiero, released under the MIT license, whose
