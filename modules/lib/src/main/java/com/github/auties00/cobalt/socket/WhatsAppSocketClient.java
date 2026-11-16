@@ -788,13 +788,7 @@ public sealed abstract class WhatsAppSocketClient {
             case WEB -> DevicePlatformType.CHROME;
             default -> throw new IllegalStateException("Unexpected value: " + platform);
         };
-        var os = switch (platform) {
-            case IOS, IOS_BUSINESS -> "iOS";
-            case ANDROID, ANDROID_BUSINESS -> "Android";
-            case WINDOWS, WEB -> "Windows";
-            case MACOS -> "Mac OS";
-            default -> throw new IllegalStateException("Unexpected value: " + platform);
-        };
+        var os = deviceOsName(platform, store.accountStore().name().orElse(null));
         var props = new DevicePropsBuilder()
                 .os(os)
                 .platformType(platformType)
@@ -1555,5 +1549,27 @@ public sealed abstract class WhatsAppSocketClient {
         boolean isTransportOpen() {
             return socket != null && !socket.isClosed() && socket.isConnected();
         }
+    }
+
+    /**
+     * The device name shown in the phone's "Linked devices" list ({@code DeviceProps.os}).
+     *
+     * <p>For a web or desktop companion it is the configured client name when there is one (the
+     * {@code name(...)} of the builder, still the configured value at pairing time, before the
+     * profile name syncs), so an integration shows up under its own name instead of "Windows". The
+     * icon comes from {@code platformType} and is drawn by the phone; there is no image field.
+     *
+     * @param platform   the companion platform
+     * @param configured the configured client name, or {@code null}
+     * @return the name sent as {@code DeviceProps.os}
+     */
+    static String deviceOsName(ClientPlatformType platform, String configured) {
+        return switch (platform) {
+            case IOS, IOS_BUSINESS -> "iOS";
+            case ANDROID, ANDROID_BUSINESS -> "Android";
+            case WINDOWS, WEB -> configured == null || configured.isBlank() ? "Windows" : configured.strip();
+            case MACOS -> configured == null || configured.isBlank() ? "Mac OS" : configured.strip();
+            default -> throw new IllegalStateException("Unexpected value: " + platform);
+        };
     }
 }
