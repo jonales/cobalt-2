@@ -65,9 +65,31 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * @param whatsapp the owning {@link LinkedWhatsAppClient} instance
      */
     public NewsletterStatusStreamHandler(LinkedWhatsAppClient whatsapp, com.github.auties00.cobalt.ack.AckSender ackSender) {
+        this(whatsapp, ackSender, null);
+    }
+
+    /**
+     * Constructs a handler that also forwards contact statuses.
+     *
+     * <p>The relay delivers a contact's status update ({@code from="status@broadcast"}) as a
+     * {@code <status>} stanza. WA Web ({@code WAWebCommsHandleMessagingStanza}) rewrites it to a
+     * {@code <message>} and runs it through the regular message pipeline; {@code contactStatus}
+     * receives those stanzas for the same purpose. Without it they were acknowledged and dropped, so
+     * no {@code onNewStatus} callback ever fired.
+     *
+     * @param whatsapp      the owning {@link LinkedWhatsAppClient} instance
+     * @param ackSender     sends the {@code class="status"} acknowledgement of every stanza
+     * @param contactStatus receives non-newsletter status stanzas, or {@code null} to drop them
+     */
+    public NewsletterStatusStreamHandler(LinkedWhatsAppClient whatsapp, com.github.auties00.cobalt.ack.AckSender ackSender,
+                                         java.util.function.Consumer<Stanza> contactStatus) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
+        this.contactStatus = contactStatus;
     }
+
+    /** Receives contact statuses ({@code status@broadcast}); {@code null} drops them. */
+    private final java.util.function.Consumer<Stanza> contactStatus;
 
     /**
      * {@inheritDoc}
@@ -88,9 +110,9 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      */
     @Override
     public void handle(Stanza stanza) {
-        // Every status stanza is acknowledged, including contact statuses (status@broadcast) that
-        // this handler does not process: without the ack the relay stopped draining the offline
-        // queue and held every live message behind it.
+        // Every status stanza is acknowledged here, with class "status" (contact statuses included:
+        // the message pipeline they are forwarded to does not ack them again). Without the ack the
+        // relay stopped draining the offline queue and held every live message behind it.
         try {
             handleStatus(stanza);
         } finally {
@@ -104,7 +126,13 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
 
     private void handleStatus(Stanza stanza) {
         var from = stanza.getAttributeAsJid("from", null);
-        if (from == null || !from.hasNewsletterServer()) {
+        if (from == null) {
+            return;
+        }
+        if (!from.hasNewsletterServer()) {
+            if (contactStatus != null) {
+                contactStatus.accept(stanza);
+            }
             return;
         }
 
