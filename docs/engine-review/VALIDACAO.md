@@ -27,6 +27,8 @@ Use a tabela "O que observar" do `README.md` do spike.
 
 ## O que medir e onde cada resultado entra no STATUS.md
 
+Já validado ao vivo (jonales/Cobalt#3 e #4): tempo de login, aviso de código de segurança e `pkmsg` x `msg`. Repita só como teste de regressão.
+
 | Medida | Como ver | Item do STATUS.md |
 |---|---|---|
 | Tempo do scan até "logado" | relógio; no log, `post-handshake bootstrap complete` | 1.1, 1.2 |
