@@ -553,13 +553,39 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
      */
     @Override
     public void handle(Stanza node) {
+        handle(node, true);
+    }
+
+    /**
+     * Runs a contact's status update through the message pipeline.
+     *
+     * <p>The relay delivers it as {@code <status from="status@broadcast">}; like WA Web's
+     * {@code WAWebCommsHandleMessagingStanza}, the stanza is rewritten to a {@code <message>} with
+     * the same attributes and children and processed as one, which decrypts it, stores it and fires
+     * {@code onNewStatus}. The caller already acknowledged it with {@code class="status"}, so no
+     * second {@code class="message"} ack is sent.
+     *
+     * @param status the inbound {@code <status>} stanza
+     */
+    public void handleContactStatus(Stanza status) {
+        var message = new com.github.auties00.cobalt.stanza.model.StanzaBuilder()
+                .description("message")
+                .attributes(status.attributes())
+                .content(status.children())
+                .build();
+        handle(message, false);
+    }
+
+    private void handle(Stanza node, boolean ack) {
         var from = node.getAttributeAsJid("from").orElse(null);
         if (from == null) {
             return;
         }
 
         var handleStartNanos = System.nanoTime();
-        ackSender.sendAck(AckClass.MESSAGE, node);
+        if (ack) {
+            ackSender.sendAck(AckClass.MESSAGE, node);
+        }
 
         if ("medianotify".equals(node.getAttributeAsString("type", null))) {
             if (Log.TRACE) LOGGER.log(Level.TRACE, "medianotify stanza from {0}, skipping", from);
