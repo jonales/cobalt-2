@@ -57,4 +57,5 @@ Com isso, a próxima sessão do Claude compara com o caminho de envio do motor
 Validados: vídeo (3.7), foto da própria conta (3.8), status de contato com "visto" automático
 (3.9) e logout fechando a conexão (3.10). Falta: remover a foto da conta, um vídeo que precise
 transcodificar, a consulta MEX de grupo (3.6) e o retry observado ao vivo (3.1).
+Também falta ver num pareamento novo: o nome configurado em "Aparelhos conectados" (3.11).
 
