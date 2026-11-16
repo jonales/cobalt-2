@@ -1,12 +1,10 @@
 <!-- Link + badge definitions (maintained in one place) -->
-[upstream]: https://github.com/Auties00/Cobalt
 [license]: LICENSE
 [cloud-api]: https://developers.facebook.com/docs/whatsapp/cloud-api
 [java25]: https://openjdk.org/projects/jdk/25/
 
 [badge-license]: https://img.shields.io/badge/LICENSE-MIT-2f81f7?style=for-the-badge&labelColor=0b0e14
 [badge-java]: https://img.shields.io/badge/JAVA-25-f89820?style=for-the-badge&logo=openjdk&logoColor=white&labelColor=0b0e14
-[badge-upstream]: https://img.shields.io/badge/FORK%20OF-Auties00%2FCobalt-2f81f7?style=for-the-badge&logo=github&labelColor=0b0e14
 
 <div align="center">
 
@@ -24,44 +22,44 @@
 
 [![Java][badge-java]][java25]
 [![License][badge-license]][license]
-[![Upstream][badge-upstream]][upstream]
 
 </div>
 
 ## About this repository
 
-**cobalt-2** is an independent continuation of [Cobalt][upstream], the WhatsApp library written by Alessandro Autiero (Auties00) and released under the MIT license. It came from the `jonales/Cobalt` fork and is maintained as the WhatsApp engine of **Msgforge** (`jonales/msgforge-api`).
+**cobalt-2** is the WhatsApp engine of **Msgforge** (`jonales/msgforge-api`), developed and
+released from this repository. All fixes, validation and releases happen here; report problems in
+this repository's issue tracker.
 
-What changes compared with upstream:
+- **Fixes found in live tests.** Most of the work comes from running Msgforge against real phones: message retry, call rejection, group metadata, video and voice-note sending, own profile picture, contact statuses, logout that closes the connection, device lists and the security-code (ICDC) warning, Signal sessions addressed by LID, and others. The state of each item is tracked in [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), and what still needs a real phone is listed in [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
+- **Served by JitPack.** There is no Maven Central release (see [Install](#install)).
 
-- **Fixes found in live tests.** Most of the work here comes from running Msgforge against real phones: message retry, call rejection, group metadata, video and voice-note sending, device lists and the security-code (ICDC) warning, Signal sessions addressed by LID, and others. The state of each item is tracked in [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), and what still needs a real phone is listed in [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
-- **No Maven Central release.** The fork is served by JitPack from this repository (see [Install](#install)).
-- **Separate issue tracker.** Report problems with this fork here, not on the upstream repository.
-
-Credit for the design and for most of the code belongs to the upstream project. This fork does not speak for it.
+cobalt-2 derives from the Cobalt library by Alessandro Autiero, released under the MIT license, whose
+copyright notice is kept in [LICENSE][license]. It is maintained independently and does not follow
+that project.
 
 ## Disclaimer
 
-Cobalt is an independent, unofficial project. It is not affiliated with, authorized, maintained, sponsored, or endorsed by WhatsApp LLC or Meta Platforms, Inc., or any of their affiliates. All product and company names are trademarks of their respective holders.
+cobalt-2 is an independent, unofficial project. It is not affiliated with, authorized, maintained, sponsored, or endorsed by WhatsApp LLC or Meta Platforms, Inc., or any of their affiliates. All product and company names are trademarks of their respective holders.
 
-The reverse-engineered Linked transport talks to WhatsApp's private protocol. WhatsApp does not support third-party clients, so this transport may breach its Terms of Service, lead to account restrictions, or stop working at any time. Good-faith use of your own account carries little risk, but sending unsolicited or automated bulk messages, especially from new numbers, is exactly what WhatsApp's anti-spam systems act on. Use Cobalt responsibly and at your own risk. For commercial messaging, prefer the official Cloud API.
+The reverse-engineered Linked transport talks to WhatsApp's private protocol. WhatsApp does not support third-party clients, so this transport may breach its Terms of Service, lead to account restrictions, or stop working at any time. Good-faith use of your own account carries little risk, but sending unsolicited or automated bulk messages, especially from new numbers, is exactly what WhatsApp's anti-spam systems act on. Use cobalt-2 responsibly and at your own risk. For commercial messaging, prefer the official Cloud API.
 
 ---
 
-## What is Cobalt
+## What is cobalt-2
 
-Cobalt lets a JVM application be a WhatsApp client. It supports two completely different ways of reaching WhatsApp, behind one sealed client API:
+cobalt-2 lets a JVM application be a WhatsApp client. It supports two completely different ways of reaching WhatsApp, behind one sealed client API:
 
 - **The Linked client** is a clean-room reimplementation of the real WhatsApp Web, Desktop and Mobile apps. No browser, no Selenium, no bridge process.
 - **The Cloud client** drives Meta's official, hosted [WhatsApp Cloud API][cloud-api] over plain HTTPS, with a built-in webhook server for inbound traffic.
 
-> **_IMPORTANT:_** Cobalt is pre-`1.0`: expect breaking changes until the API is frozen.
+> **_IMPORTANT:_** cobalt-2 is pre-`1.0`: expect breaking changes until the API is frozen.
 
 ---
 
 ## Install
 
-Cobalt targets **Java 25**. This fork is not on Maven Central; it is served by [JitPack](https://jitpack.io/#jonales/cobalt-2), which builds it from this repository on the first request for a version (the first download can take a few minutes; later ones are cached).
+cobalt-2 targets **Java 25**. cobalt-2 is not on Maven Central; it is served by [JitPack](https://jitpack.io/#jonales/cobalt-2), which builds it from this repository on the first request for a version (the first download can take a few minutes; later ones are cached).
 
 **Maven**
 
@@ -105,7 +103,7 @@ cd cobalt-2
 mvn -DskipTests install -pl modules/lib -am
 ```
 
-A local install keeps the coordinates of the `pom.xml`, `com.github.auties00:cobalt-lib:0.1.0` (inherited from upstream), resolved from `mavenLocal()`. To build a fixed revision (as Msgforge does, in `scripts/install-cobalt.sh`), check out the commit you want before `mvn install`.
+A local install keeps the coordinates of the `pom.xml`, `com.github.auties00:cobalt-lib:0.1.0` (kept for compatibility with existing code), resolved from `mavenLocal()`. To build a fixed revision (as Msgforge does, in `scripts/install-cobalt.sh`), check out the commit you want before `mvn install`.
 
 ### Native libraries
 
@@ -141,7 +139,7 @@ void main() throws Exception {
             .linkedApi()
             .webClient()                               // session persisted under ~/.cobalt/proto
             .createConnection()                        // a fresh connection
-            .name("Cobalt Bot")                        // the linked-device name shown in WhatsApp
+            .name("cobalt-2 Bot")                        // the linked-device name shown in WhatsApp
             .unregistered(QrCode.toTerminal())         // print the QR to scan
             .addLoggedInListener(api -> System.out.println("Connected"))
             .addNewMessageListener((api, message) -> {
@@ -164,7 +162,7 @@ Prefer a pairing code over a QR? Swap the terminal stage (and import `...Web.Pai
 
 ### Cloud API
 
-For a Business Platform number, supply your credentials and let Cobalt run the webhook server for inbound traffic.
+For a Business Platform number, supply your credentials and let cobalt-2 run the webhook server for inbound traffic.
 
 ```java
 import com.github.auties00.cobalt.client.WhatsAppClient;
@@ -194,7 +192,7 @@ Both examples are compiled against the current code.
 
 ## The quickstart, explained
 
-The QR example above is a complete client in one expression. Walking it line by line touches every concept Cobalt relies on.
+The QR example above is a complete client in one expression. Walking it line by line touches every concept cobalt-2 relies on.
 
 ### `WhatsAppClient.builder()`
 
@@ -230,19 +228,19 @@ A connection is one registered session, and this stage decides where it comes fr
 
 Reusing a persisted connection is why a client does not show the QR twice.
 
-### `.name("Cobalt Bot")`
+### `.name("cobalt-2 Bot")`
 
 The options stage configures the session before registration:
 
 - `name(...)` is the device name shown under Linked devices.
 - `proxy(...)` routes the connection through a proxy.
-- `device(...)` is the device Cobalt presents itself as.
+- `device(...)` is the device cobalt-2 presents itself as.
 - `clientVersion(...)` pins the WhatsApp client version.
 - `releaseChannel(...)` selects RELEASE or BETA; BETA unlocks Web calling.
 - `fullHistory()`, `defaultHistory()` and `discardHistory()` control how much history the phone syncs.
 - `errorHandler(...)` sets the recovery policy.
 
-The error handler is Cobalt's whole recovery policy: every failure is a typed exception in a sealed `WhatsAppException` hierarchy, and your `WhatsAppLinkedClientErrorHandler` maps it to one of `DISCARD`, `DISCONNECT`, `RECONNECT`, `LOG_OUT`, or `BAN`. Nothing is hardcoded; the default handler logs and keeps the client alive.
+The error handler is cobalt-2's whole recovery policy: every failure is a typed exception in a sealed `WhatsAppException` hierarchy, and your `WhatsAppLinkedClientErrorHandler` maps it to one of `DISCARD`, `DISCONNECT`, `RECONNECT`, `LOG_OUT`, or `BAN`. Nothing is hardcoded; the default handler logs and keeps the client alive.
 
 ### `.unregistered(QrCode.toTerminal())`
 
@@ -274,7 +272,7 @@ Inside the listener you meet the message model, three types that appear in every
 
 ### `api.sendMessage(chat, LinkedMessageContainer.of("..."))`
 
-`LinkedMessageContainer.of(...)` wraps content for sending; the `String` overload is plain text. Richer content is built first, because every model in Cobalt follows the same convention: a generated `<TypeName>Builder` constructs it, fields are read with `field()` accessors (not `getField()`), absent fields return `Optional`, and lists are unmodifiable.
+`LinkedMessageContainer.of(...)` wraps content for sending; the `String` overload is plain text. Richer content is built first, because every model in cobalt-2 follows the same convention: a generated `<TypeName>Builder` constructs it, fields are read with `field()` accessors (not `getField()`), absent fields return `Optional`, and lists are unmodifiable.
 
 ```java
 var location = new LocationMessageBuilder()
@@ -287,7 +285,7 @@ api.sendMessage(chat, LinkedMessageContainer.of(location));
 
 `sendMessage` returns the `MessageKey` of what was sent, closing the loop: hold on to it to edit, delete, or react later.
 
-> **_IMPORTANT:_** `sendMessage` is a plain blocking call, like every operation in Cobalt: it returns the result or throws, and there is no `CompletableFuture` anywhere in the API. Blocking is cheap because everything runs on virtual threads; this listener is already on its own, so a slow send never stalls the connection. To run operations in parallel, start your own virtual threads.
+> **_IMPORTANT:_** `sendMessage` is a plain blocking call, like every operation in cobalt-2: it returns the result or throws, and there is no `CompletableFuture` anywhere in the API. Blocking is cheap because everything runs on virtual threads; this listener is already on its own, so a slow send never stalls the connection. To run operations in parallel, start your own virtual threads.
 
 ### `.connect()`
 
@@ -306,7 +304,7 @@ Opens the encrypted socket, runs the Noise handshake, and starts processing traf
 The Cloud quickstart follows the same shape with a different first stage. There is no QR and no Signal state; the Cloud store is small (access token, phone-number id, WABA id, app secret, webhook config) and persistent by default:
 
 - `loadConnection(accessToken, phoneNumberId)` loads or creates the connection with the required credentials and opens the configuration stage; `loadConnection(phoneNumberId)` and `loadLatestConnection()` resume a saved one.
-- `appSecret(...)` lets Cobalt sign requests and verify webhook payloads.
+- `appSecret(...)` lets cobalt-2 sign requests and verify webhook payloads.
 - `webhook(verifyToken, port)` starts the built-in webhook server when you connect; it answers Meta's verification handshake and validates the `X-Hub-Signature-256` of every delivery before dispatching events.
 - `build()` produces the `CloudWhatsAppClient`.
 
@@ -320,16 +318,16 @@ Listeners register exactly as on the Linked client, and `sendMessage` takes the 
 - Engine review: [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md) lists what is fixed, validated, pending, or still a hypothesis; update it with every engine fix.
 - Live validation needs real phones and does not run in the cloud: see [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
 
-### Tooling inherited from upstream
+### Code generators
 
-Parts of Cobalt are regenerated by deterministic extractors that run against the real WhatsApp Web client (each one is a Node project: `npm install`, `npm run build`, `npm start`):
+Parts of cobalt-2 are regenerated by deterministic extractors that run against the real WhatsApp Web client (each one is a Node project: `npm install`, `npm run build`, `npm start`):
 
 - [tools/web/proto-extractor](tools/web/proto-extractor): extracts every protobuf message and enum into `whatsapp.proto`, the reference for the hand-written models in [modules/wire](modules/wire).
 - [tools/web/ab-props-codegen](tools/web/ab-props-codegen): regenerates the `ABProp` constants in `modules/wire/wire-linked`.
 - [tools/web/graphql-extractor](tools/web/graphql-extractor): dumps the spec of every GraphQL/MEX operation, used to validate the models in `modules/wire/wire-graphql`.
 - [tools/web/wam-codegen](tools/web/wam-codegen): regenerates the WAM telemetry events in `modules/wire/wire-wam`, consumed by the [modules/wam-core](modules/wam-core) processor.
 - [tools/web/mcp-server](tools/web/mcp-server): the MCP server for reverse engineering and live WhatsApp Web sessions (`npm install`, `npx playwright install chromium`, `npm run build`, `npm start`).
-- [.claude/commands/validate.md](.claude/commands/validate.md): the experimental `/validate` command, which compares Cobalt modules with their WhatsApp counterparts. It is expensive and has never been run end to end.
+- [.claude/commands/validate.md](.claude/commands/validate.md): the experimental `/validate` command, which compares cobalt-2 modules with their WhatsApp counterparts. It is expensive and has never been run end to end.
 
 ---
 

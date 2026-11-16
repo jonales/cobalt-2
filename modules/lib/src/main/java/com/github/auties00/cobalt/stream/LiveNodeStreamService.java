@@ -198,7 +198,7 @@ public final class LiveNodeStreamService implements NodeStreamService {
         var callMessageBuffer = new CallMessageBuffer();
         var result = new HashMap<String, SocketStreamHandler>();
         addHandler(result, "iq", new IqStreamHandler(whatsapp, webVerificationHandler, deviceService, snapshotRecoveryService, lidMigrationService, companionPairingService, shortcakePairingService, wamService));
-        addHandler(result, "message", new MessageStreamHandler(
+        var messageHandler = new MessageStreamHandler(
                 whatsapp,
                 messageService,
                 snapshotRecoveryService,
@@ -210,7 +210,8 @@ public final class LiveNodeStreamService implements NodeStreamService {
                 abPropsService,
                 tosService,
                 quarantineService
-        ));
+        );
+        addHandler(result, "message", messageHandler);
         addHandler(result, "receipt", new ReceiptStreamHandler(whatsapp, messageService, wamService, ackSender));
         addHandler(result, "presence", new PresenceStreamHandler(whatsapp));
         addHandler(result, "chatstate", new ChatStateStreamHandler(whatsapp));
@@ -244,7 +245,10 @@ public final class LiveNodeStreamService implements NodeStreamService {
         addHandler(result, "failure", new FailureStreamHandler(whatsapp));
         addHandler(result, "stream:error", new StreamErrorStreamHandler(whatsapp));
         addHandler(result, "error", new ErrorStreamHandler());
-        addHandler(result, "status", new NewsletterStatusStreamHandler(whatsapp, ackSender));
+        // <status> traz posts de canal e, de contatos (status@broadcast), o status em si: estes seguem
+        // pelo caminho das mensagens, como no WAWebCommsHandleMessagingStanza
+        addHandler(result, "status", new NewsletterStatusStreamHandler(whatsapp, ackSender,
+                messageHandler::handleContactStatus));
         addHandler(result, "xmlstreamend", new XmlStreamEndStreamHandler());
         this.handlers = Collections.unmodifiableMap(result);
     }
