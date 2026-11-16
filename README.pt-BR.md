@@ -31,7 +31,7 @@ O **cobalt-2** é o motor de WhatsApp do **Msgforge** (`jonales/msgforge-api`), 
 publicado a partir deste repositório. Correções, validação e versões acontecem aqui; problemas vão
 para as issues deste repositório.
 
-- **Correções achadas em testes ao vivo.** A maior parte do trabalho vem de rodar o Msgforge com celulares de verdade: reenvio de mensagem (retry), recusa de chamada, metadados de grupo, envio de vídeo e de nota de voz, lista de aparelhos e o aviso de código de segurança (ICDC), sessões Signal pelo LID, entre outras. O estado de cada item fica em [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), e o que ainda precisa de celular está em [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
+- **Correções achadas em testes ao vivo.** A maior parte do trabalho vem de rodar o Msgforge com celulares de verdade: reenvio de mensagem (retry), recusa de chamada, metadados de grupo, envio de vídeo e de nota de voz, foto da própria conta, status de contatos, logout que fecha a conexão, lista de aparelhos e o aviso de código de segurança (ICDC), sessões Signal pelo LID, entre outras. O estado de cada item fica em [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), e o que ainda precisa de celular está em [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
 - **Servido pelo JitPack.** Não há versão no Maven Central (veja [Instalação](#instalação)).
 
 O cobalt-2 deriva da biblioteca Cobalt, de Alessandro Autiero, publicada sob a licença MIT, cujo

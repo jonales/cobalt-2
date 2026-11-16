@@ -110,6 +110,13 @@ Custom protobuf library (`com.github.auties00:protobuf-serialization-plugin`), N
 Built via `NodeBuilder` with `.description()`, `.attribute()`, `.content()`.
 `Node` has convenience methods to get and stream attributes and content: use the best convenience method to improve code readability. The `Stanza` node model and its binary codec live in `cobalt-stanza-core` (`stanza.model`, `stanza.binary`); the typed operation models live in `cobalt-wire-stanza` under `wire.stanza.iq`, `wire.stanza.mex`, `wire.stanza.smax`, `wire.stanza.usync`.
 
+Live-tested protocol facts (keep the engine aligned with WA Web on these):
+- A contact's status arrives as `<status from="status@broadcast">`; it is rewritten to `<message>` and
+  runs through `MessageStreamHandler.handleContactStatus` (one ack, `class=status`). Only newsletter
+  `<status>` stays in `NewsletterStatusStreamHandler`.
+- `w:profile:picture`: `target` only for groups; one `<picture type="image">`, no preview.
+- `logout()` disconnects right after `remove-companion-device` succeeds.
+
 ### Calls / VOIP (`calls`)
 The `calls` package is a from-WASM reimplementation of WA Web/Desktop 1:1 and group (SFU) voice/video calls; it replaced the older, incorrect `call` package, which no longer exists. Native FFM bindings live in `modules/lib/natives`, and the jextract generators that emit their Java side live in `modules/lib/dependencies/<lib>/generate.sh`; the pure-Java MLow codec (WA's `smpl` float CELP audio codec) is under `calls/media/audio/codec/mlow`. Cobalt-side layers: signaling (`signaling/*`, `signaling/session/OfferStanza`), the engine (`engine/LifecycleController`, `engine/mediaplane/LiveMediaSession`, streams/subscriptions), relay/media transport (`transport/*`: `LiveRelayTransport`, `MediaTransport`, `transport/dtls/VoipDtlsTransport`, `transport/srtp/E2eMediaSrtp`), plus `capability`, `config`, `crypto`, `media`, `platform`, `stream`, `telemetry` and `util`. The driver example run from IntelliJ is `WebQrLoginExample` (under `src/test/java`).
 
