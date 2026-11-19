@@ -6823,11 +6823,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> queryAbout(JidProvider jidProvider) {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
-        // EXPERIMENTO: as duas, para comparar
-        var viaUsync = queryAboutViaUsyncMex(jid);
-        var viaGetAbout = queryAboutViaMexGetAbout(jid);
-        LOGGER.log(Level.WARNING, "EXP about usync={0} getAbout={1}", viaUsync, viaGetAbout);
-        return viaUsync.or(() -> viaGetAbout);
+        if (jid.hasLidServer() || abPropsService.getBool(ABProp.MEX_USYNC_ABOUT_STATUS)) {
+            return queryAboutViaUsyncMex(jid);
+        }
+        return queryAboutViaMexGetAbout(jid);
     }
 
     /** {@inheritDoc} */
@@ -12015,10 +12014,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                                                String input) {
         var request = new UsyncMexRequest(includeAboutStatus, includeCountryCode, includeUsername, input);
         var response = sendNode(request);
-        // EXPERIMENTO (tirar antes do PR): o JSON da consulta usync via MEX
-        response.getChild("result").flatMap(Stanza::toContentBytes)
-                .ifPresent(json -> LOGGER.log(Level.WARNING, "EXP usyncMex: {0}",
-                        new String(json, java.nio.charset.StandardCharsets.UTF_8)));
         return UsyncMexResponse.of(response);
     }
 
