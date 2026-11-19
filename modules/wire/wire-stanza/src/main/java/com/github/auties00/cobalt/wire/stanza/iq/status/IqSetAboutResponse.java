@@ -54,12 +54,11 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
     }
 
     /**
-     * Models the reply variant carrying the revision identifier the relay assigned to the new
-     * about-text version.
+     * Models the successful reply to an about-text update.
      *
-     * <p>The about-id is monotonically increasing and is read from the {@code id} attribute of
-     * the success envelope, letting callers order subsequent edits against concurrently
-     * arriving server-pushed about-text updates.
+     * <p>The {@code id} attribute of the success envelope is read as an opaque string: observed live
+     * (2026-11-19), the relay echoes the request id there (for example {@code C783B2327A}), which
+     * is not a number.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetAboutJob")
     final class Success implements IqSetAboutResponse {
@@ -67,15 +66,15 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
          * Holds the relay-assigned about-text revision identifier read from the {@code id}
          * attribute of the success envelope.
          */
-        private final long aboutId;
+        private final String aboutId;
 
         /**
          * Constructs a successful reply from the given revision identifier.
          *
          * @param aboutId the relay-assigned revision identifier
          */
-        public Success(long aboutId) {
-            this.aboutId = aboutId;
+        public Success(String aboutId) {
+            this.aboutId = Objects.requireNonNull(aboutId, "aboutId cannot be null");
         }
 
         /**
@@ -83,7 +82,7 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
          *
          * @return the about-id
          */
-        public long aboutId() {
+        public String aboutId() {
             return aboutId;
         }
 
@@ -92,11 +91,7 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
          *
          * <p>Returns a present {@link Optional} only when the stanza is a successful IQ result
          * echoing the {@code request} id, per {@link SmaxIqResultResponseMixin#validate(Stanza, Stanza)},
-         * and carries an integer {@code id} attribute.
-         *
-         * @implNote This implementation returns {@link Optional#empty()} rather than
-         *           synthesising an about-id when the {@code id} attribute is absent, because a
-         *           fabricated identifier would break the monotonic ordering callers rely on.
+         * and carries a non-empty {@code id} attribute (an opaque string).
          *
          * @param stanza    the inbound IQ stanza
          * @param request the original outbound request
@@ -110,11 +105,14 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
             if (!SmaxIqResultResponseMixin.validate(stanza, request)) {
                 return Optional.empty();
             }
-            var idAttr = stanza.getAttributeAsLong("id");
-            if (idAttr.isEmpty()) {
+            // O relay devolve no id o identificador da própria requisição (ex.: "C783B2327A", em
+            // hexadecimal), e não um número: lido como texto. Exigir um long fazia todo sucesso real
+            // cair em Optional.empty() e o editAbout lançar NPE com o recado já trocado.
+            var id = stanza.getAttributeAsString("id", null);
+            if (id == null || id.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(new Success(idAttr.getAsLong()));
+            return Optional.of(new Success(id));
         }
 
         /**
@@ -133,7 +131,7 @@ public sealed interface IqSetAboutResponse extends IqStanza.Response
                 return false;
             }
             var that = (Success) obj;
-            return this.aboutId == that.aboutId;
+            return this.aboutId.equals(that.aboutId);
         }
 
         /**

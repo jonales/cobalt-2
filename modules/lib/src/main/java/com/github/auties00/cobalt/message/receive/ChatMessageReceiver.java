@@ -72,6 +72,7 @@ import com.github.auties00.cobalt.wire.wam.type.QbmFlag;
 import com.github.auties00.cobalt.wire.wam.type.ReportingTokenValidationFailureReason;
 import com.github.auties00.cobalt.wire.wam.type.StructuredMessageClass;
 
+import com.github.auties00.cobalt.wire.linked.contact.Contact;
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -1176,7 +1177,29 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                 .flatMap(ChatMessageContextInfo::messageSecret)
                 .ifPresent(builder::messageSecret);
 
+        if (!fromMe) {
+            stanza.pushName().ifPresent(pushName -> refreshPushName(senderJid, pushName));
+        }
+
         return builder.build();
+    }
+
+    /**
+     * Keeps a known contact's push name in step with the {@code notify} attribute of its messages.
+     *
+     * <p>Before this, a contact's {@link Contact#chosenName() chosen name} only changed through
+     * profile notifications, so after the contact renamed itself the store kept the old name even
+     * though every new message already carried the new one (observed live on 2026-11-19).
+     * Only contacts already in the store are touched: a group with hundreds of senders does not
+     * create one contact per sender.
+     */
+    private void refreshPushName(Jid senderJid, String pushName) {
+        if (pushName.isBlank() || !(senderJid.hasUserServer() || senderJid.hasLidServer())) {
+            return;
+        }
+        store.contactStore().findContactByJid(senderJid)
+                .filter(contact -> !pushName.equals(contact.chosenName().orElse(null)))
+                .ifPresent(contact -> contact.setChosenName(pushName));
     }
 
     /**
