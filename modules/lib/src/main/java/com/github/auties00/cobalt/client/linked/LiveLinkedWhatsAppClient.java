@@ -7093,10 +7093,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     private Optional<String> queryAboutViaMexGetAbout(Jid user) {
         var request = new FetchAboutStatusMexRequest(user.toString());
         var response = sendNode(request);
-        // EXPERIMENTO (tirar antes do PR): o JSON que o relay devolve para o mexGetAbout
-        response.getChild("result").flatMap(Stanza::toContentBytes)
-                .ifPresent(json -> LOGGER.log(Level.WARNING, "EXP mexGetAbout {0}: {1}", user,
-                        new String(json, java.nio.charset.StandardCharsets.UTF_8)));
         return FetchAboutStatusMexResponse.of(response)
                 .map(FetchAboutStatusMexResponse::items)
                 .flatMap(items -> items.stream().findFirst())
