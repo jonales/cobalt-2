@@ -6823,11 +6823,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> queryAbout(JidProvider jidProvider) {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
-        // EXPERIMENTO: as duas, para comparar
+        // EXPERIMENTO: as três, para comparar
+        var viaStatus = queryAboutViaUsyncStatus(jid);
         var viaUsync = queryAboutViaUsyncMex(jid);
         var viaGetAbout = queryAboutViaMexGetAbout(jid);
-        LOGGER.log(Level.WARNING, "EXP about usync={0} getAbout={1}", viaUsync, viaGetAbout);
-        return viaUsync.or(() -> viaGetAbout);
+        LOGGER.log(Level.WARNING, "EXP about status={0} usyncMex={1} getAbout={2}", viaStatus, viaUsync, viaGetAbout);
+        return viaStatus.or(() -> viaUsync).or(() -> viaGetAbout);
     }
 
     /** {@inheritDoc} */
@@ -7091,6 +7092,30 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebMexFetchAboutStatusJob", exports = "mexGetAbout",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    private Optional<String> queryAboutViaUsyncStatus(Jid user) {
+        var pkg = "com.github.auties00.cobalt.wire.stanza.usync";
+        var query = com.github.auties00.cobalt.wire.stanza.usync.UsyncQuery.ofStatus()
+                .withContext(com.github.auties00.cobalt.wire.stanza.usync.UsyncContext.INTERACTIVE)
+                .withUser(com.github.auties00.cobalt.wire.stanza.usync.UsyncUser.byId(user.toUserJid()));
+        com.github.auties00.cobalt.wire.stanza.usync.UsyncResult result;
+        try {
+            result = sendNode(query);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        }
+        LOGGER.log(Level.WARNING, "EXP usync status failed={0} users={1}", result.failed(), result.users().size());
+        if (result.failed()) {
+            return Optional.empty();
+        }
+        return result.users().stream().findFirst()
+                .flatMap(u -> u.getProtocolResult(com.github.auties00.cobalt.wire.stanza.usync.protocol.UsyncStatusProtocol.NAME))
+                .filter(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult.class::isInstance)
+                .map(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult.class::cast)
+                .flatMap(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult::status)
+                .filter(text -> !text.isEmpty());
+    }
+
     private Optional<String> queryAboutViaMexGetAbout(Jid user) {
         var request = new FetchAboutStatusMexRequest(user.toString());
         var response = sendNode(request);
