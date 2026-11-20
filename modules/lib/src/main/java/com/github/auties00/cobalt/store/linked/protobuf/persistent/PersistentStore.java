@@ -540,6 +540,8 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      */
     void close() {
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing session {0}", accountStore().uuid());
+        // The flusher of a client that ended must not write an old snapshot over the new client's session
+        stopFlusher();
         var messageStore = chatStore.messageStore();
         if (messageStore != null) {
             messageStore.close();

@@ -81,6 +81,16 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
     /**
      * The root directory under which per-session folders are created.
      */
+    /**
+     * Sessions opened by any factory in this process, keyed by the message store path. The MVStore takes a
+     * file lock, and nothing closed it when a client ended for good (disconnect or a terminal failure), so
+     * opening the same session again in the same process failed with OverlappingFileLockException until the
+     * process exited (observed live on 2026-11-20: a proxy outage left the instance unable to reconnect).
+     * Two clients on one session are never valid, so opening a session closes the previous handle first.
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<Path, PersistentStore> OPEN =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     private final Path directory;
 
     /**
@@ -202,11 +212,13 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
         }
         var store = PersistentStore.deserialize(storeFile);
         var envPath = PersistentStore.messagesEnvPath(clientType, directory, sessionId);
+        closePrevious(envPath);
         var messageStore = PersistentMessageStore.open(envPath, mapSize);
         store.setMessageStore(messageStore);
         var wamPath = PersistentStore.wamBuffersEnvPath(clientType, directory, sessionId);
         store.setWamBuffersStore(PersistentWamBuffersStore.open(wamPath));
         recoverOrphans(store, messageStore);
+        OPEN.put(key(envPath), store);
         writeLatestSession(clientType, sessionId);
         if (Log.INFO) LOGGER.log(Level.INFO, "session loaded for client type {0}", clientType);
         return Optional.of(store);
@@ -352,6 +364,19 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
         return store;
     }
 
+    /** Closes the handle a previous client left open on this session, if any, so its files can be locked again. */
+    private static void closePrevious(Path envPath) {
+        var previous = OPEN.remove(key(envPath));
+        if (previous != null) {
+            if (Log.INFO) LOGGER.log(Level.INFO, "closing the previous handle of a session opened again");
+            previous.close();
+        }
+    }
+
+    private static Path key(Path envPath) {
+        return envPath.toAbsolutePath().normalize();
+    }
+
     /**
      * Opens fresh MVStores for {@code sessionId}, wires them into {@code store}, and records the
      * session as the most recently opened one.
@@ -373,7 +398,9 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
      */
     private void attachFreshStores(PersistentStore store, LinkedWhatsAppClientType clientType, String sessionId) throws IOException {
         var envPath = PersistentStore.messagesEnvPath(clientType, directory, sessionId);
+        closePrevious(envPath);
         store.setMessageStore(PersistentMessageStore.open(envPath, mapSize));
+        OPEN.put(key(envPath), store);
         var wamPath = PersistentStore.wamBuffersEnvPath(clientType, directory, sessionId);
         store.setWamBuffersStore(PersistentWamBuffersStore.open(wamPath));
         writeLatestSession(clientType, sessionId);
