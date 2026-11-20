@@ -426,6 +426,7 @@ public final class LiveMessageSendingService implements MessageSendingService {
                                 + " with JID type " + parentJid.server());
                 }
             };
+            rememberSentPoll(messageInfo);
             // Hand the local user's own trusted-contact token to a one-to-one peer after a non-protocol
             // message, matching WAWebSendMsgJob, so the peer keeps a current token across identity
             // rotations; the issue is gated to at most once per sender bucket. Fire-and-forget on a
@@ -966,5 +967,28 @@ public final class LiveMessageSendingService implements MessageSendingService {
             LOGGER.log(Level.DEBUG, "sending peer message to {0}", targetDevice);
         }
         return peerSender.send(targetDevice, messageInfo);
+    }
+
+    /**
+     * Keeps a sent poll in its chat, so a vote on it can be decrypted later.
+     *
+     * <p>Outgoing messages are not added to the store by the send path. A vote is decrypted with the
+     * poll's {@code messageSecret}, which only the stored poll carries; without it the account that
+     * created the poll never decrypted a single vote (observed live on 2026-11-19, while the voters
+     * did). Only polls are kept, so ordinary sends do not grow the store.
+     */
+    private void rememberSentPoll(LinkedMessageInfo messageInfo) {
+        if (!(messageInfo instanceof ChatMessageInfo chatMessage)
+                || chatMessage.message() == null
+                || !(chatMessage.message().content() instanceof PollCreationMessage)) {
+            return;
+        }
+        var chatJid = chatMessage.key().parentJid().orElse(null);
+        if (chatJid == null) {
+            return;
+        }
+        var chats = client.store().chatStore();
+        var chat = chats.findChatByJid(chatJid).orElseGet(() -> chats.addNewChat(chatJid));
+        chat.addMessage(chatMessage);
     }
 }

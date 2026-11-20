@@ -25,7 +25,9 @@ import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
 import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 import com.github.auties00.cobalt.wire.core.message.MessageStatus;
 import com.github.auties00.cobalt.wire.linked.message.MessageThreadId;
@@ -318,13 +320,12 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         if (pollKey == null) {
             return;
         }
-        if (!(store.chatStore().findMessageByKey(pollKey).orElse(null) instanceof ChatMessageInfo pollCreation)
+        if (!(findPollCreation(pollKey, stanza) instanceof ChatMessageInfo pollCreation)
                 || !(pollCreation.message().content() instanceof PollCreationMessage creation)) {
             return;
         }
-        var voterJid = stanza.senderJid().toUserJid();
         try {
-            var selectedHashes = EncMessageFactory.decryptPollVote(poll.vote().get(), pollCreation, voterJid);
+            var selectedHashes = decryptVote(poll, pollCreation, stanza);
             poll.setSelectedOptions(matchSelectedOptions(creation, selectedHashes));
         } catch (RuntimeException exception) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG,
@@ -335,6 +336,72 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                     .messageMediaType(MediaType.POLL_VOTE)
                     .build());
         }
+    }
+
+    /**
+     * Decrypts a vote trying the phone-number and LID forms of the poll author and of the voter.
+     *
+     * <p>A vote may arrive addressed by LID (with the phone number only in {@code sender_pn}) for a
+     * poll sent to the phone number, and the key binds whatever forms the voter used. The first pair
+     * that authenticates wins; when none does, the last failure is rethrown.
+     */
+    private List<byte[]> decryptVote(PollUpdateMessage poll, ChatMessageInfo pollCreation, MessageReceiveStanza stanza) {
+        var voters = new java.util.LinkedHashSet<Jid>();
+        voters.add(stanza.senderJid().toUserJid());
+        stanza.senderPn().ifPresent(pn -> voters.add(pn.toUserJid()));
+        if (isFromMe(stanza)) {
+            // Own vote echoed from another device: it comes from the account's LID, without sender_pn
+            store.accountStore().jid().ifPresent(jid -> voters.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> voters.add(jid.toUserJid()));
+        }
+        var authors = new java.util.LinkedHashSet<Jid>();
+        if (pollCreation.key().fromMe()) {
+            store.accountStore().jid().ifPresent(jid -> authors.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> authors.add(jid.toUserJid()));
+        } else {
+            pollCreation.key().senderJid().or(pollCreation.key()::parentJid).ifPresent(jid -> authors.add(jid.toUserJid()));
+        }
+        RuntimeException last = new IllegalArgumentException("no poll author or voter to try");
+        for (var author : authors) {
+            for (var voter : voters) {
+                try {
+                    return EncMessageFactory.decryptPollVote(poll.vote().get(), pollCreation, author, voter);
+                } catch (RuntimeException failure) {
+                    last = failure;
+                }
+            }
+        }
+        throw last;
+    }
+
+    /**
+     * Finds the poll a vote refers to.
+     *
+     * <p>The voter writes the poll key from its own point of view. When the vote reaches the poll's
+     * creator in a one-to-one chat, that key's parent JID is the creator itself (with
+     * {@code fromMe=false}), while the creator stored the poll in the chat with the voter. The lookup
+     * by key then misses, and the vote stayed encrypted on the side that needs it (observed live on
+     * 2026-11-19: the voter saw its option, the creator got none). When the key misses, the poll is
+     * looked up by id in the chat the vote arrived in, then in the chat with the sender.
+     */
+    private LinkedMessageInfo findPollCreation(MessageKey pollKey, MessageReceiveStanza stanza) {
+        var byKey = store.chatStore().findMessageByKey(pollKey).orElse(null);
+        if (byKey != null) {
+            return byKey;
+        }
+        var id = pollKey.id().orElse(null);
+        if (id == null) {
+            return null;
+        }
+        LinkedMessageInfo found = store.chatStore().findMessageById(resolveChatJid(stanza), id).orElse(null);
+        if (found == null) {
+            found = store.chatStore().findMessageById(stanza.senderJid().toUserJid(), id).orElse(null);
+        }
+        if (found == null && stanza.senderPn().isPresent()) {
+            // Vote addressed by LID for a poll stored in the phone-number chat
+            found = store.chatStore().findMessageById(stanza.senderPn().get().toUserJid(), id).orElse(null);
+        }
+        return found;
     }
 
     /**

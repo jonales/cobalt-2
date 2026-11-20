@@ -316,6 +316,31 @@ public final class EncMessageFactory {
                 .orElseThrow(() -> new IllegalArgumentException("Poll creation key has no parentJid"));
 
         var originalSender = resolveOriginalSender(pollKey, pollKeyJid, voterJid);
+        return decryptPollVote(vote, pollCreation, originalSender, voterJid);
+    }
+
+    /**
+     * Decrypts a poll vote with an explicit poll author.
+     *
+     * <p>The addon key is bound to the poll's author and to the voter. On the side that created the
+     * poll ({@code fromMe}), the author is the current account, which the three-argument overload
+     * cannot know: it used the voter instead, so the creator never decrypted a vote (observed live on
+     * 2026-11-19). Callers that know the account pass it here; the JIDs may be phone-number or LID
+     * forms, so a caller may try both.
+     *
+     * @param originalSender the poll's author
+     * @param voterJid       the user that cast the vote
+     */
+    public static List<byte[]> decryptPollVote(PollEncValue vote, ChatMessageInfo pollCreation, Jid originalSender,
+                                               Jid voterJid) {
+        Objects.requireNonNull(vote, "vote cannot be null");
+        Objects.requireNonNull(pollCreation, "pollCreation cannot be null");
+        Objects.requireNonNull(originalSender, "originalSender cannot be null");
+        Objects.requireNonNull(voterJid, "voterJid cannot be null");
+        var pollSecret = pollCreation.messageSecret()
+                .orElseThrow(() -> new IllegalArgumentException("Poll creation has no messageSecret"));
+        var pollKeyId = pollCreation.key().id()
+                .orElseThrow(() -> new IllegalArgumentException("Poll creation key has no id"));
 
         var ciphertext = vote.encPayload()
                 .orElseThrow(() -> new IllegalArgumentException("Poll vote has no encrypted payload"));
@@ -324,7 +349,7 @@ public final class EncMessageFactory {
 
         var plaintext = MessageAddonEncryption.decrypt(
                 new MessageEncryptedAddon(ciphertext, iv), pollSecret, pollKeyId,
-                originalSender, voterJid.toUserJid(),
+                originalSender.toUserJid(), voterJid.toUserJid(),
                 MessageAddonType.POLL_VOTE);
 
         var selectedOptions = PollVoteMessageSpec.decode(plaintext).selectedOptions();

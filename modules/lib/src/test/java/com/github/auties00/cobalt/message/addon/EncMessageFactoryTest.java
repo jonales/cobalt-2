@@ -211,6 +211,23 @@ class EncMessageFactoryTest {
     }
 
     @Test
+    @DisplayName("decryptPollVote: the poll's creator decrypts a vote with itself as the author")
+    void pollCreatorDecryptsVote() {
+        // The voter sees the poll as someone else's (fromMe=false, sent by the creator)
+        var votersView = parent(PARENT_SECRET, PARENT_KEY_ID, false, OTHER_SENDER);
+        var vote = EncMessageFactory.encryptPollVote(List.of("Option A"), votersView, SELF_JID);
+        // The creator stored the same poll as its own (fromMe=true)
+        var creatorsView = parent(PARENT_SECRET, PARENT_KEY_ID, true, OTHER_SENDER);
+
+        // Observed live (2026-11-19): with fromMe the three-argument overload binds the key to the voter
+        // as the author, so the creator never decrypted a vote
+        assertThrows(RuntimeException.class,
+                () -> EncMessageFactory.decryptPollVote(vote, creatorsView, SELF_JID));
+        var options = EncMessageFactory.decryptPollVote(vote, creatorsView, OTHER_SENDER, SELF_JID);
+        assertEquals(1, options.size());
+    }
+
+    @Test
     @DisplayName("encryptPollVote: missing parent secret throws IllegalArgumentException")
     void encryptPollVoteMissingSecret() {
         var poll = parent(null, PARENT_KEY_ID, false, OTHER_SENDER);
