@@ -7115,6 +7115,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         var query = UsyncQuery.ofContact(UsyncAddressingMode.PN)
                 .withContext(UsyncContext.INTERACTIVE)
+                .withStatusProtocol()
                 .withTextStatusProtocol()
                 .withUser(UsyncUser.byPhoneNumber(phoneNumber));
         UsyncResult result;
@@ -7126,6 +7127,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         if (result.failed()) {
             return Optional.empty();
+        }
+        // The classic about (status protocol) first, then the newer text status
+        var classic = result.users().stream()
+                .map(userResult -> userResult.getProtocolResult(com.github.auties00.cobalt.wire.stanza.usync.protocol.UsyncStatusProtocol.NAME).orElse(null))
+                .filter(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult.class::isInstance)
+                .map(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult.class::cast)
+                .findFirst()
+                .flatMap(com.github.auties00.cobalt.wire.stanza.usync.result.StatusResult::status)
+                .filter(text -> !text.isEmpty());
+        if (classic.isPresent()) {
+            return classic;
         }
         return result.users().stream()
                 .map(userResult -> userResult.getProtocolResult(UsyncTextStatusProtocol.NAME).orElse(null))
