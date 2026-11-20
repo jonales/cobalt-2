@@ -349,6 +349,11 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var voters = new java.util.LinkedHashSet<Jid>();
         voters.add(stanza.senderJid().toUserJid());
         stanza.senderPn().ifPresent(pn -> voters.add(pn.toUserJid()));
+        if (isFromMe(stanza)) {
+            // Own vote echoed from another device: it comes from the account's LID, without sender_pn
+            store.accountStore().jid().ifPresent(jid -> voters.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> voters.add(jid.toUserJid()));
+        }
         var authors = new java.util.LinkedHashSet<Jid>();
         if (pollCreation.key().fromMe()) {
             store.accountStore().jid().ifPresent(jid -> authors.add(jid.toUserJid()));
