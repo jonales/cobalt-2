@@ -324,9 +324,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                 || !(pollCreation.message().content() instanceof PollCreationMessage creation)) {
             return;
         }
-        var voterJid = stanza.senderJid().toUserJid();
         try {
-            var selectedHashes = EncMessageFactory.decryptPollVote(poll.vote().get(), pollCreation, voterJid);
+            var selectedHashes = decryptVote(poll, pollCreation, stanza);
             poll.setSelectedOptions(matchSelectedOptions(creation, selectedHashes));
         } catch (RuntimeException exception) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG,
@@ -337,6 +336,37 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                     .messageMediaType(MediaType.POLL_VOTE)
                     .build());
         }
+    }
+
+    /**
+     * Decrypts a vote trying the phone-number and LID forms of the poll author and of the voter.
+     *
+     * <p>A vote may arrive addressed by LID (with the phone number only in {@code sender_pn}) for a
+     * poll sent to the phone number, and the key binds whatever forms the voter used. The first pair
+     * that authenticates wins; when none does, the last failure is rethrown.
+     */
+    private List<byte[]> decryptVote(PollUpdateMessage poll, ChatMessageInfo pollCreation, MessageReceiveStanza stanza) {
+        var voters = new java.util.LinkedHashSet<Jid>();
+        voters.add(stanza.senderJid().toUserJid());
+        stanza.senderPn().ifPresent(pn -> voters.add(pn.toUserJid()));
+        var authors = new java.util.LinkedHashSet<Jid>();
+        if (pollCreation.key().fromMe()) {
+            store.accountStore().jid().ifPresent(jid -> authors.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> authors.add(jid.toUserJid()));
+        } else {
+            pollCreation.key().senderJid().or(pollCreation.key()::parentJid).ifPresent(jid -> authors.add(jid.toUserJid()));
+        }
+        RuntimeException last = new IllegalArgumentException("no poll author or voter to try");
+        for (var author : authors) {
+            for (var voter : voters) {
+                try {
+                    return EncMessageFactory.decryptPollVote(poll.vote().get(), pollCreation, author, voter);
+                } catch (RuntimeException failure) {
+                    last = failure;
+                }
+            }
+        }
+        throw last;
     }
 
     /**
@@ -361,6 +391,10 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         LinkedMessageInfo found = store.chatStore().findMessageById(resolveChatJid(stanza), id).orElse(null);
         if (found == null) {
             found = store.chatStore().findMessageById(stanza.senderJid().toUserJid(), id).orElse(null);
+        }
+        if (found == null && stanza.senderPn().isPresent()) {
+            // Vote addressed by LID for a poll stored in the phone-number chat
+            found = store.chatStore().findMessageById(stanza.senderPn().get().toUserJid(), id).orElse(null);
         }
         return found;
     }
