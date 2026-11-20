@@ -327,6 +327,8 @@ import com.github.auties00.cobalt.wire.stanza.smax.voip.*;
 import com.github.auties00.cobalt.wire.stanza.smax.waffle.*;
 import com.github.auties00.cobalt.wire.stanza.usync.*;
 import com.github.auties00.cobalt.wire.stanza.usync.protocol.UsyncContactProtocol;
+import com.github.auties00.cobalt.wire.stanza.usync.result.TextStatusResult;
+import com.github.auties00.cobalt.wire.stanza.usync.protocol.UsyncTextStatusProtocol;
 import com.github.auties00.cobalt.wire.stanza.usync.result.ContactResult;
 import com.github.auties00.cobalt.wire.stanza.usync.result.UsyncProtocolError;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
@@ -6823,6 +6825,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> queryAbout(JidProvider jidProvider) {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
+        // The about line is now the usync text_status protocol (WAWebUsyncTextStatus, requested by
+        // WAWebContactSyncApi together with the contact protocol). Observed live on 2026-11-19: both
+        // MEX paths below get 400 "Bad Request" from the relay (the current WAWebMexUsyncQuery no
+        // longer projects the about status), so they are kept only as fallbacks.
+        var viaTextStatus = queryAboutViaUsyncTextStatus(jid);
+        if (viaTextStatus.isPresent()) {
+            return viaTextStatus;
+        }
         if (jid.hasLidServer() || abPropsService.getBool(ABProp.MEX_USYNC_ABOUT_STATUS)) {
             return queryAboutViaUsyncMex(jid);
         }
@@ -7090,6 +7100,42 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebMexFetchAboutStatusJob", exports = "mexGetAbout",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    /**
+     * Reads the about line with the usync {@code text_status} protocol, the way WA Web's contact sync
+     * does: a contact query (phone number) plus {@code <text_status/>}, read from the {@code text}
+     * attribute of the user's {@code text_status} result. Empty for a user without a phone number
+     * (LID only), an empty about or a hidden one.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncTextStatus", exports = "USyncTextStatusProtocol",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private Optional<String> queryAboutViaUsyncTextStatus(Jid user) {
+        var phoneNumber = user.toPhoneNumber().orElse(null);
+        if (phoneNumber == null) {
+            return Optional.empty();
+        }
+        var query = UsyncQuery.ofContact(UsyncAddressingMode.PN)
+                .withContext(UsyncContext.INTERACTIVE)
+                .withTextStatusProtocol()
+                .withUser(UsyncUser.byPhoneNumber(phoneNumber));
+        UsyncResult result;
+        try {
+            result = sendNode(query);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        }
+        if (result.failed()) {
+            return Optional.empty();
+        }
+        return result.users().stream()
+                .map(userResult -> userResult.getProtocolResult(UsyncTextStatusProtocol.NAME).orElse(null))
+                .filter(TextStatusResult.class::isInstance)
+                .map(TextStatusResult.class::cast)
+                .findFirst()
+                .flatMap(TextStatusResult::text)
+                .filter(text -> !text.isEmpty());
+    }
+
     private Optional<String> queryAboutViaMexGetAbout(Jid user) {
         var request = new FetchAboutStatusMexRequest(user.toString());
         var response = sendNode(request);
