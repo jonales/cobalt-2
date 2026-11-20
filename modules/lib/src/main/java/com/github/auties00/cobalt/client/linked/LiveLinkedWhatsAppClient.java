@@ -1540,9 +1540,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             shutdownHook = null;
         }
 
+        // A listener that throws must not skip the reconnect request below: the exception used to
+        // propagate out of disconnect0 and the client never reconnected (an application listener
+        // writing to a database that dropped together with the network, on this interrupted thread)
         for (var listener : store.listeners()) {
             if (listener instanceof DisconnectedListener typed) {
-                typed.onDisconnected(this, reason);
+                try {
+                    typed.onDisconnected(this, reason);
+                } catch (RuntimeException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "disconnected listener failed; continuing", e);
+                }
             }
         }
 
