@@ -25,7 +25,9 @@ import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.wire.core.jid.Jid;
 import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
+import com.github.auties00.cobalt.wire.core.message.MessageKey;
 import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
 import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 import com.github.auties00.cobalt.wire.core.message.MessageStatus;
 import com.github.auties00.cobalt.wire.linked.message.MessageThreadId;
@@ -318,7 +320,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         if (pollKey == null) {
             return;
         }
-        if (!(store.chatStore().findMessageByKey(pollKey).orElse(null) instanceof ChatMessageInfo pollCreation)
+        if (!(findPollCreation(pollKey, stanza) instanceof ChatMessageInfo pollCreation)
                 || !(pollCreation.message().content() instanceof PollCreationMessage creation)) {
             return;
         }
@@ -335,6 +337,32 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                     .messageMediaType(MediaType.POLL_VOTE)
                     .build());
         }
+    }
+
+    /**
+     * Finds the poll a vote refers to.
+     *
+     * <p>The voter writes the poll key from its own point of view. When the vote reaches the poll's
+     * creator in a one-to-one chat, that key's parent JID is the creator itself (with
+     * {@code fromMe=false}), while the creator stored the poll in the chat with the voter. The lookup
+     * by key then misses, and the vote stayed encrypted on the side that needs it (observed live on
+     * 2026-11-19: the voter saw its option, the creator got none). When the key misses, the poll is
+     * looked up by id in the chat the vote arrived in, then in the chat with the sender.
+     */
+    private LinkedMessageInfo findPollCreation(MessageKey pollKey, MessageReceiveStanza stanza) {
+        var byKey = store.chatStore().findMessageByKey(pollKey).orElse(null);
+        if (byKey != null) {
+            return byKey;
+        }
+        var id = pollKey.id().orElse(null);
+        if (id == null) {
+            return null;
+        }
+        LinkedMessageInfo found = store.chatStore().findMessageById(resolveChatJid(stanza), id).orElse(null);
+        if (found == null) {
+            found = store.chatStore().findMessageById(stanza.senderJid().toUserJid(), id).orElse(null);
+        }
+        return found;
     }
 
     /**
