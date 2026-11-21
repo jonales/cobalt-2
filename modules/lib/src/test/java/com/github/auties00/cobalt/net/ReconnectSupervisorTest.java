@@ -102,6 +102,20 @@ class ReconnectSupervisorTest {
     }
 
     @Test
+    @DisplayName("attempts anyway when the monitor is stuck offline (stale native monitor)")
+    void attemptsWhenMonitorIsStuckOffline() {
+        var attempt = new FakeAttempt(0);
+        // The monitor never reports online again, as a vigil monitor whose event loop stopped
+        var monitor = new TestNetworkConnectivityMonitor(false);
+        var supervisor = new ReconnectSupervisor(attempt, attempt.connected::get, () -> false, monitor, new Random(1),
+                java.time.Duration.ofMillis(200));
+        supervisor.requestReconnect();
+        assertTrue(awaitTrue(attempt.connected::get, 3_000), "should reconnect without the monitor coming back");
+        assertEquals(1, attempt.calls.get(), "one attempt after the wait ceiling");
+        supervisor.cancel();
+    }
+
+    @Test
     @DisplayName("cancel stops further attempts")
     void cancelStops() throws InterruptedException {
         var attempt = new FakeAttempt(-1);

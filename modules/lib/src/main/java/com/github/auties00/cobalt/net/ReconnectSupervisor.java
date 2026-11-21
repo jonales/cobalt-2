@@ -6,6 +6,7 @@ import com.github.auties00.vigil.ConnectivityMonitor;
 
 import java.io.IOException;
 import java.lang.System.Logger.Level;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.random.RandomGenerator;
@@ -43,6 +44,18 @@ public final class ReconnectSupervisor {
     private static final System.Logger LOGGER = Log.get(ReconnectSupervisor.class);
 
     /**
+     * How long an attempt waits for the connectivity monitor to report online before trying anyway.
+     *
+     * <p>The monitor is an optimization (do not hammer the server while the host is offline), not a
+     * source of truth: a native monitor whose event loop stops (for example a netlink {@code recv}
+     * failure after the host sleeps, which ends vigil's loop without a log) freezes its last state. If
+     * that state is offline, an unbounded wait parks the supervisor forever and the client never
+     * reconnects. With this ceiling the loop attempts anyway and a failed attempt falls back to the
+     * usual backoff.
+     */
+    static final Duration DEFAULT_OFFLINE_RECHECK = Duration.ofSeconds(30);
+
+    /**
      * The connection attempt invoked once per iteration.
      */
     private final ConnectAttempt attempt;
@@ -70,6 +83,11 @@ public final class ReconnectSupervisor {
      * thread or by {@link #onConnectivityRegained()}.
      */
     private final ReconnectBackoff backoff;
+
+    /**
+     * Ceiling of each wait for connectivity; see {@link #DEFAULT_OFFLINE_RECHECK}.
+     */
+    private final Duration offlineRecheck;
 
     /**
      * Monitor guarding {@link #reconnectRequested} and backing the idle wait.
@@ -113,6 +131,20 @@ public final class ReconnectSupervisor {
      *                   {@code null}
      */
     public ReconnectSupervisor(ConnectAttempt attempt, BooleanSupplier connected, BooleanSupplier terminated, ConnectivityMonitor monitor, RandomGenerator random) {
+        this(attempt, connected, terminated, monitor, random, DEFAULT_OFFLINE_RECHECK);
+    }
+
+    /**
+     * Constructs a supervisor with a custom ceiling for the connectivity wait (tests use a short one).
+     *
+     * @param offlineRecheck how long to wait for the monitor to report online before attempting anyway;
+     *                       must be positive
+     */
+    ReconnectSupervisor(ConnectAttempt attempt, BooleanSupplier connected, BooleanSupplier terminated, ConnectivityMonitor monitor, RandomGenerator random, Duration offlineRecheck) {
+        if (offlineRecheck == null || offlineRecheck.isNegative() || offlineRecheck.isZero()) {
+            throw new IllegalArgumentException("offlineRecheck must be positive");
+        }
+        this.offlineRecheck = offlineRecheck;
         this.attempt = Objects.requireNonNull(attempt, "attempt cannot be null");
         this.connected = Objects.requireNonNull(connected, "connected cannot be null");
         this.terminated = Objects.requireNonNull(terminated, "terminated cannot be null");
@@ -239,7 +271,10 @@ public final class ReconnectSupervisor {
     private void reconnectUntilConnected() {
         while (!cancelled && !terminated.getAsBoolean() && !connected.getAsBoolean()) {
             try {
-                monitor.awaitOnline();
+                if (!monitor.awaitOnline(offlineRecheck) && Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "connectivity monitor still reports offline after {0}s; attempting reconnect anyway",
+                            offlineRecheck.toSeconds());
+                }
             } catch (InterruptedException _) {
                 if (cancelled || terminated.getAsBoolean()) {
                     return;
