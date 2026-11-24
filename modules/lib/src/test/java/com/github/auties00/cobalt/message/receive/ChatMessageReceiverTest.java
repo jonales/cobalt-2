@@ -137,4 +137,57 @@ class ChatMessageReceiverTest {
                         .build())
                 .build();
     }
+
+    // Live defect of 2026-11-23: the first message from a sender in a new group came with two encs (a per-device
+    // one holding only the sender-key distribution and an SKMSG with the text); the receiver kept the first
+    // plaintext and lost the text, because the SKMSG was tried before the distribution was imported.
+    @Test
+    @DisplayName("Group first message: imports the sender key from the PKMSG and returns the SKMSG content")
+    void groupFirstMessageKeepsTheSkmsgContent() {
+        var group = Jid.of("120363000000000000@g.us");
+        var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
+        var recipientStore = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
+        TestSignalSession.establishSession(senderStore, RECIPIENT_PRIMARY, recipientStore);
+        var senderEncryption = new MessageEncryption(senderStore,
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
+
+        var distribution = LinkedMessageContainer.of(
+                new com.github.auties00.cobalt.wire.linked.message.group.SenderKeyDistributionMessageBuilder()
+                        .groupJid(group)
+                        .axolotlSenderKeyDistributionMessage(senderEncryption.getSenderKeyBytes(group, SENDER_PRIMARY))
+                        .build());
+        var perDevice = senderEncryption.encryptForDevice(RECIPIENT_PRIMARY,
+                LinkedMessageContainerSpec.encode(distribution));
+        var groupText = senderEncryption.encryptForGroup(group, SENDER_PRIMARY,
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("primeira mensagem no grupo")));
+
+        var inbound = new StanzaBuilder()
+                .description("message")
+                .attribute("id", "3EB0GRP0001")
+                .attribute("from", group)
+                .attribute("participant", SENDER_PRIMARY)
+                .attribute("t", 1700000000L)
+                .attribute("type", "text")
+                .content(new StanzaBuilder().description("enc").attribute("v", "2").attribute("type", "pkmsg")
+                                .content(perDevice.ciphertext()).build(),
+                        new StanzaBuilder().description("enc").attribute("v", "2").attribute("type", "skmsg")
+                                .content(groupText.ciphertext()).build())
+                .build();
+
+        var recipientDecryption = new MessageDecryption(recipientStore,
+                new SignalSessionCipher(recipientStore.signalStore()),
+                new SignalGroupCipher(recipientStore.signalStore()),
+                new SignalCryptoLocks());
+        var receiver = new ChatMessageReceiver(recipientStore, recipientDecryption,
+                TestWamService.create(TestWhatsAppClient.create().withStore(recipientStore)));
+
+        var info = receiver.receive(inbound, SENDER_PRIMARY);
+
+        assertNotNull(info, "the first group message must be received");
+        var text = assertInstanceOf(ExtendedTextMessage.class, info.message().content(),
+                "the content is the SKMSG text, not the empty sender-key container");
+        assertEquals("primeira mensagem no grupo", text.text().orElseThrow());
+    }
 }
