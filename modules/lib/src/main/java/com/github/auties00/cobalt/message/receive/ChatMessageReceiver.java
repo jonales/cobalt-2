@@ -28,6 +28,7 @@ import com.github.auties00.cobalt.wire.linked.message.FutureProofMessageType;
 import com.github.auties00.cobalt.wire.core.message.MessageKey;
 import com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.wire.linked.message.LinkedMessageInfo;
+import com.github.auties00.cobalt.wire.linked.message.EmptyMessage;
 import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainer;
 import com.github.auties00.cobalt.wire.core.message.MessageStatus;
 import com.github.auties00.cobalt.wire.linked.message.MessageThreadId;
@@ -677,6 +678,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     private byte[] decryptPayloads(MessageReceiveStanza stanza) {
         learnSenderLidMapping(stanza);
         byte[] plaintext = null;
+        byte[] withPayload = null;
 
         for (var enc : stanza.encs()) {
             if (!messageDecryptor.canDecryptNext(enc)) {
@@ -689,6 +691,17 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                 if (plaintext == null) {
                     plaintext = decrypted;
                 }
+                // The first message from a sender in a group carries two encs: the per-device one (MSG/PKMSG)
+                // holds only the sender-key distribution, the SKMSG holds the actual content. The distribution
+                // must be imported before the SKMSG is tried, or the SKMSG fails and the text is lost; and the
+                // content is the one to return, not the first plaintext.
+                var decoded = enc.e2eType() == MessageEncryptionType.SKMSG ? null : decodeQuietly(stanza, decrypted);
+                if (decoded != null) {
+                    processSenderKeyDistribution(decoded, stanza);
+                }
+                if (withPayload == null && hasPayload(decoded != null ? decoded : decodeQuietly(stanza, decrypted))) {
+                    withPayload = decrypted;
+                }
                 if (Log.DEBUG) LOGGER.log(Level.DEBUG,
                         "decrypted message {0} via {1}",
                         stanza.id(), enc.e2eType());
@@ -697,6 +710,9 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             }
         }
 
+        if (withPayload != null) {
+            return withPayload;
+        }
         if (plaintext != null) {
             return plaintext;
         }
@@ -709,6 +725,20 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         throw new WhatsAppMessageException.Receive.Unknown(
                 "No encrypted payloads could be decrypted for: "
                         + stanza.id(), null);
+    }
+
+    /** Decodes a decrypted payload without failing the stanza; null when it is not a valid container. */
+    private LinkedMessageContainer decodeQuietly(MessageReceiveStanza stanza, byte[] plaintext) {
+        try {
+            return decodeProtobuf(stanza.id(), plaintext);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Whether the container carries a message, not only side-channel fields (sender-key distribution, context). */
+    private static boolean hasPayload(LinkedMessageContainer container) {
+        return container != null && !(container.content() instanceof EmptyMessage);
     }
 
     /**
