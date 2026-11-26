@@ -159,7 +159,7 @@ public final class TextPipeline {
         this.cache = new LinkPreviewCache();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .followRedirects(HttpClient.Redirect.NEVER)   // CB-02: a redirect would skip the address check
                 .build();
     }
 
@@ -413,6 +413,13 @@ public final class TextPipeline {
             emitLinkPreviewDisplay(WebcDisplayStatusType.PREVIEW_MALFORMED, false, false, true);
             return;
         }
+        // CB-02: the link is written by whoever sends the text; only public addresses are fetched
+        if (!com.github.auties00.cobalt.util.PublicAddress.isPublic(uri)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "link preview skipped: the address is not public");
+            attachMinimal(match, message);
+            emitLinkPreviewDisplay(WebcDisplayStatusType.PREVIEW_NOT_FOUND, false, false, true);
+            return;
+        }
         var preview = LinkPreview.createPreview(uri).orElse(null);
         if (preview == null) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview not found via http fetch");
@@ -626,6 +633,10 @@ public final class TextPipeline {
         }
         var firstImage = images.iterator().next();
         if (firstImage == null || firstImage.uri() == null) {
+            return null;
+        }
+        if (!com.github.auties00.cobalt.util.PublicAddress.isPublic(firstImage.uri())) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "link preview thumbnail skipped: the address is not public");
             return null;
         }
         return PreviewThumbnailFetcher.download(httpClient, firstImage.uri(), linkPreviewTimeout());
