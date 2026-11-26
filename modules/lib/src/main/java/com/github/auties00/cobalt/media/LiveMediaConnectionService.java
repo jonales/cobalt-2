@@ -1165,7 +1165,12 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
     @WhatsAppWebExport(moduleName = "WAWebMmsClient", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private InputStream performDownload(MediaProvider provider) throws WhatsAppMediaException, InterruptedException {
-        var defaultUploadUrl = provider.mediaUrl();
+        // The cached url comes inside the message, so the sender chooses it: only a WhatsApp CDN address is
+        // fetched; anything else falls back to the hosts that the server's media_conn reports (CB-01)
+        var defaultUploadUrl = provider.mediaUrl().filter(LiveMediaConnectionService::isWhatsAppMediaUrl);
+        if (provider.mediaUrl().isPresent() && defaultUploadUrl.isEmpty() && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "ignoring a media url outside the WhatsApp CDN; resolving the host instead");
+        }
         if (defaultUploadUrl.isPresent()) {
             try {
                 return tryDownload(provider, defaultUploadUrl.get());
@@ -1488,8 +1493,13 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
     @WhatsAppWebExport(moduleName = "WAWebMmsClientMmsDownload", exports = "mms4Download",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public InputStream tryDownload(MediaProvider provider, String downloadUrl) throws WhatsAppMediaException.Download {
+        if (!isWhatsAppMediaUrl(downloadUrl)) {
+            throw new WhatsAppMediaException.Download(WhatsAppMediaException.HTTP_NOT_FOUND,
+                    "mmsDownload: url outside the WhatsApp CDN");
+        }
+        // No redirects: a 3xx from the CDN is an error, never a hop to an address nobody checked
         var client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
         var request = HttpRequest.newBuilder()
                 .uri(URI.create(downloadUrl))
@@ -1627,6 +1637,31 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
     @WhatsAppWebExport(moduleName = "WAWebMmsClientIsErrorRetryable",
             exports = "isErrorRetryable",
             adaptation = WhatsAppAdaptation.DIRECT)
+    /**
+     * Whether a media url may be fetched: {@code https} on a WhatsApp CDN host ({@code whatsapp.net} or a subdomain,
+     * such as {@code mmg.whatsapp.net} and {@code media-*.cdn.whatsapp.net}), without user info or a custom port.
+     *
+     * <p>The url of a received message is written by its sender. Fetched as is, it let any contact make the client
+     * request internal addresses (SSRF, CB-01 of the 2026-11-14 review).
+     *
+     * @param url the url to check
+     * @return {@code true} only for a WhatsApp CDN address
+     */
+    static boolean isWhatsAppMediaUrl(String url) {
+        if (url == null) {
+            return false;
+        }
+        try {
+            var uri = URI.create(url);
+            var host = uri.getHost();
+            return "https".equalsIgnoreCase(uri.getScheme()) && host != null && uri.getUserInfo() == null
+                    && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && (host.equalsIgnoreCase("whatsapp.net") || host.toLowerCase(java.util.Locale.ROOT).endsWith(".whatsapp.net"));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     private static boolean isDownloadRetryable(WhatsAppMediaException.Download exception) {
         var optStatus = exception.httpStatusCode();
         if (optStatus.isEmpty()) {
@@ -1780,7 +1815,7 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
         var url = formatDownloadUrl(hostname, directPath, encFileHash, mediaType, null);
 
         try (var client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build()) {
             var request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
