@@ -190,4 +190,75 @@ class ChatMessageReceiverTest {
                 "the content is the SKMSG text, not the empty sender-key container");
         assertEquals("primeira mensagem no grupo", text.text().orElseThrow());
     }
+
+    // Live defect of 2026-11-25: current clients send an edit as a secretEncMessage (MESSAGE_EDIT) encrypted with
+    // the edited message's messageSecret; it reached listeners still encrypted and empty.
+    @Test
+    @DisplayName("Message edit: decrypts the secretEncMessage into a MESSAGE_EDIT protocol message")
+    void messageEditIsDecrypted() {
+        var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
+        var recipientStore = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
+        TestSignalSession.establishSession(senderStore, RECIPIENT_PRIMARY, recipientStore);
+
+        var secret = new byte[32];
+        java.util.Arrays.fill(secret, (byte) 7);
+        var targetKey = new com.github.auties00.cobalt.wire.core.message.MessageKeyBuilder()
+                .id("3EB0ORIGINAL")
+                .fromMe(false)
+                .parentJid(SENDER_BARE)
+                .senderJid(SENDER_BARE)
+                .build();
+        recipientStore.chatStore().addNewChat(SENDER_BARE).addMessage(
+                new com.github.auties00.cobalt.wire.linked.chat.ChatMessageInfoBuilder()
+                        .key(targetKey)
+                        .message(LinkedMessageContainer.of("texto errado"))
+                        .messageSecret(secret)
+                        .build());
+
+        var addon = com.github.auties00.cobalt.message.addon.MessageAddonEncryption.encrypt(
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of("texto corrigido")),
+                secret, "3EB0ORIGINAL", SENDER_BARE, SENDER_BARE,
+                com.github.auties00.cobalt.message.addon.MessageAddonType.MESSAGE_EDIT);
+        var edit = new com.github.auties00.cobalt.wire.linked.message.security.SecretEncMessageBuilder()
+                .targetMessageKey(targetKey)
+                .encPayload(addon.ciphertext())
+                .encIv(addon.iv())
+                .secretEncType(com.github.auties00.cobalt.wire.linked.message.security.SecretEncMessage.SecretEncType.MESSAGE_EDIT)
+                .build();
+        var senderEncryption = new MessageEncryption(senderStore,
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
+        var payload = senderEncryption.encryptForDevice(RECIPIENT_PRIMARY,
+                LinkedMessageContainerSpec.encode(LinkedMessageContainer.of(edit)));
+
+        var inbound = new StanzaBuilder()
+                .description("message")
+                .attribute("id", "3EB0EDIT0001")
+                .attribute("from", SENDER_PRIMARY)
+                .attribute("t", 1700000000L)
+                .attribute("type", "text")
+                .attribute("edit", "1")
+                .content(new StanzaBuilder().description("enc").attribute("v", "2").attribute("type", "pkmsg")
+                        .content(payload.ciphertext()).build())
+                .build();
+        var recipientDecryption = new MessageDecryption(recipientStore,
+                new SignalSessionCipher(recipientStore.signalStore()),
+                new SignalGroupCipher(recipientStore.signalStore()),
+                new SignalCryptoLocks());
+        var receiver = new ChatMessageReceiver(recipientStore, recipientDecryption,
+                TestWamService.create(TestWhatsAppClient.create().withStore(recipientStore)));
+
+        var info = receiver.receive(inbound, SENDER_PRIMARY);
+
+        assertNotNull(info);
+        var protocol = assertInstanceOf(com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage.class,
+                info.message().content(), "the edit becomes a protocol message");
+        assertEquals(com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage.Type.MESSAGE_EDIT,
+                protocol.type().orElseThrow());
+        assertEquals("3EB0ORIGINAL", protocol.key().orElseThrow().id().orElseThrow());
+        var text = assertInstanceOf(ExtendedTextMessage.class,
+                protocol.editedMessage().orElseThrow().content());
+        assertEquals("texto corrigido", text.text().orElseThrow());
+    }
 }

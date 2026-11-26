@@ -5,6 +5,9 @@ import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException.Rece
 import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.addon.EncMessageFactory;
+import com.github.auties00.cobalt.message.addon.MessageAddonEncryption;
+import com.github.auties00.cobalt.message.addon.MessageAddonType;
+import com.github.auties00.cobalt.message.addon.MessageEncryptedAddon;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryptionHandler;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveBizInfo;
@@ -45,7 +48,10 @@ import com.github.auties00.cobalt.wire.linked.message.newsletter.NewsletterFollo
 import com.github.auties00.cobalt.wire.linked.message.system.DeviceSentMessage;
 import com.github.auties00.cobalt.wire.linked.message.poll.PollCreationMessage;
 import com.github.auties00.cobalt.wire.linked.message.poll.PollUpdateMessage;
+import com.github.auties00.cobalt.wire.linked.message.LinkedMessageContainerBuilder;
 import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessage;
+import com.github.auties00.cobalt.wire.linked.message.system.ProtocolMessageBuilder;
+import com.github.auties00.cobalt.wire.linked.message.security.SecretEncMessage;
 import com.github.auties00.cobalt.wire.linked.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.stanza.model.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
@@ -286,6 +292,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         }
 
         maybeDecryptPollVote(effectiveContainer, stanza);
+        effectiveContainer = maybeDecryptMessageEdit(effectiveContainer, stanza);
 
         var info = buildChatMessageInfo(stanza, chatJid, effectiveContainer);
         emitReceiveTelemetry(stanza, chatJid, effectiveContainer);
@@ -337,6 +344,100 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                     .messageMediaType(MediaType.POLL_VOTE)
                     .build());
         }
+    }
+
+    /**
+     * Opens an inbound message edit.
+     *
+     * <p>Current WhatsApp clients send an edit as a {@link SecretEncMessage} of type
+     * {@link SecretEncMessage.SecretEncType#MESSAGE_EDIT}: the new content is encrypted with the
+     * edited message's {@code messageSecret}, like a poll vote. Left encrypted, the edit reached
+     * listeners as an empty {@code secretEncMessage} (observed live on 2026-11-25). When the target
+     * message is in the store, the payload is decrypted and the container becomes the
+     * {@link ProtocolMessage.Type#MESSAGE_EDIT} that older clients send, with the target key and the
+     * new content. Best-effort: a missing target or a cipher rejection keeps the original container.
+     *
+     * @param container the decoded inbound message container
+     * @param stanza    the parsed receive stanza, supplying the editor JID
+     * @return the edit as a protocol message, or {@code container} unchanged
+     */
+    @WhatsAppWebExport(moduleName = "WAWebAddonEncryption", exports = "decryptAddOn",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private LinkedMessageContainer maybeDecryptMessageEdit(LinkedMessageContainer container, MessageReceiveStanza stanza) {
+        if (!(container.content() instanceof SecretEncMessage secret)
+                || secret.secretEncType().orElse(null) != SecretEncMessage.SecretEncType.MESSAGE_EDIT) {
+            return container;
+        }
+        var targetKey = secret.targetMessageKey().orElse(null);
+        var payload = secret.encPayload().orElse(null);
+        var iv = secret.encIv().orElse(null);
+        if (targetKey == null || payload == null || iv == null) {
+            return container;
+        }
+        if (!(findPollCreation(targetKey, stanza) instanceof ChatMessageInfo target) || target.messageSecret().isEmpty()) {
+            return container;
+        }
+        try {
+            var plaintext = decryptAddon(new MessageEncryptedAddon(payload, iv), target, stanza, MessageAddonType.MESSAGE_EDIT);
+            var edited = decodeProtobuf(stanza.id(), plaintext);
+            if (edited == null) {
+                return container;
+            }
+            if (edited.content() instanceof ProtocolMessage protocol
+                    && protocol.type().orElse(null) == ProtocolMessage.Type.MESSAGE_EDIT) {
+                return edited;
+            }
+            var protocol = new ProtocolMessageBuilder()
+                    .key(targetKey)
+                    .type(ProtocolMessage.Type.MESSAGE_EDIT)
+                    .editedMessageContainer(edited)
+                    .timestampMs(Instant.now())
+                    .build();
+            return new LinkedMessageContainerBuilder()
+                    .protocolMessage(protocol)
+                    .build();
+        } catch (RuntimeException exception) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "could not decrypt message edit {0}: {1}", stanza.id(), exception.getMessage());
+            return container;
+        }
+    }
+
+    /**
+     * Decrypts an addon (an edit, for now) trying the phone-number and LID forms of the target's
+     * author and of the addon's sender, as {@link #decryptVote} does for votes.
+     */
+    private byte[] decryptAddon(MessageEncryptedAddon addon, ChatMessageInfo target, MessageReceiveStanza stanza,
+                                MessageAddonType type) {
+        var secret = target.messageSecret().orElseThrow();
+        var targetId = target.key().id().orElseThrow(() -> new IllegalArgumentException("target key has no id"));
+        var senders = new java.util.LinkedHashSet<Jid>();
+        senders.add(stanza.senderJid().toUserJid());
+        stanza.senderPn().ifPresent(pn -> senders.add(pn.toUserJid()));
+        if (isFromMe(stanza)) {
+            store.accountStore().jid().ifPresent(jid -> senders.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> senders.add(jid.toUserJid()));
+        }
+        var authors = new java.util.LinkedHashSet<Jid>();
+        if (target.key().fromMe()) {
+            store.accountStore().jid().ifPresent(jid -> authors.add(jid.toUserJid()));
+            store.accountStore().lid().ifPresent(jid -> authors.add(jid.toUserJid()));
+        } else {
+            target.key().senderJid().or(target.key()::parentJid).ifPresent(jid -> authors.add(jid.toUserJid()));
+        }
+        // the editor is the author: its forms count on both sides
+        authors.addAll(senders);
+        RuntimeException last = new IllegalArgumentException("no author or sender to try");
+        for (var author : authors) {
+            for (var sender : senders) {
+                try {
+                    return MessageAddonEncryption.decrypt(addon, secret, targetId, author, sender, type);
+                } catch (RuntimeException failure) {
+                    last = failure;
+                }
+            }
+        }
+        throw last;
     }
 
     /**
