@@ -5,9 +5,9 @@ evidência (arquivo:linha, teste ou consulta ao grafo) e próximo passo. Atualiz
 arquivo e registre a memória Graphify correspondente a cada achado.
 
 - Repositório: `jonales/cobalt-2` (base `3a53a668`, 2026-11-12, vinda do repositório arquivado `jonales/Cobalt`). Os números de PR abaixo são do `cobalt-2`, salvo quando indicado `jonales/Cobalt#N`.
-- Build: Java 25 (`openjdk-25-jdk-headless`), `mvn -DskipTests install -pl modules/lib -am` OK
+- Build: Java 25 LTS (`25.0.5`), Maven Wrapper `3.9.16`, `mvn -B -DskipTests install` OK
 - Grafo: `graphify update modules` -> `modules/graphify-out/` (83k nós, 221k arestas; `graph.json` não versionado)
-- Conferência de 2026-11-16 no `master` (`2cac1f66`): os 35 testes das correções de jonales/Cobalt#3 e #4 e dos PRs #1 a #4 passam (`DeviceListMetadataWireTest`, `DeviceUSyncKeyIndexTest`, `DeviceSyncedListTimestampTest`, `SignalStoreLidAddressTest`, `ChatMessageReceiverLidTest`, `DeviceServiceTest`, `PttPipelineGranuleTest`, `AudioPipelineFrameSizeTest`, `ImagePipelineTest`, `VideoPipelineEncoderTest`, `RetryTargetChatTest`, `SuccessStreamHandlerCredentialsRefreshTest`, `RejectCreatorTest`, `RejectStanzaWireTest`).
+- Conferência de 2026-11-27 (tag `v0.1.0`): evolução LTS de bibliotecas/plugins (`compiler 3.16.0`, `surefire 3.6.1`, `JUnit 6.1.3` via `junit-bom`, `h2-mvstore 2.5.252`, `fastjson2 2.0.66`, `pdfbox 3.0.8`, `libphonenumber 9.0.44`, `zxing 3.5.4`, `ez-vcard 0.12.2`, `bouncycastle 1.87`, `javapoet 0.23.0`, `selenium 4.54.0`, FFmpeg `n7.1.5` LTS + codecs em `build-natives.sh`, `tools/web/*` em Node `>=24` LTS), substituição do `apk-parser` abandonado pelo extrator puro-JDK `ApkArchive`, centralização de `<dependencyManagement>`/`<pluginManagement>` nos POMs, CI em `.github/workflows/ci.yml`, pilar de métricas JFR nativo em `cobalt-telemetry-core`, e extração de `SyntheticTelemetryHub` + `AppStateMutationRegistry` de `LiveLinkedWhatsAppClient`. Todos os 52 testes de regressão de `cobalt-lib` + 16 de `cobalt-telemetry-core` + 5 de `cobalt-wam-core` passam (`DeviceServiceHandleDeviceNotificationTest` corrigido junto com os 4 loaders de fixtures).
 - **Ainda abertos para a 1ª versão:** 1.2, 1.3 e 2.3 (sem mudança no código) e 3.6 (mapeamento MEX de grupo). Os itens 3.7 a 3.10 (vídeo, foto da conta, status de contato e logout) foram validados ao vivo em 2026-11-15. Roteiro em `docs/engine-review/VALIDACAO.md`.
 - Memórias Graphify: `modules/graphify-out/memory/` (versionadas); consolidar com `graphify reflect --memory-dir modules/graphify-out/memory`
 
@@ -80,7 +80,7 @@ Correções de jonales/Cobalt#3 e jonales/Cobalt#4. Os dois foram validados ao v
 
 ## Testes conhecidos falhando (pré-existentes, fora do escopo)
 
-- `DeviceServiceHandleDeviceNotificationTest` (3 erros): `IllegalArgumentException: event missing 'stanza' subtree` em `DeviceFixtures.buildNodeFromEvent`; problema de fixture, não de código de produção.
+- Nenhum conhecido no momento: `DeviceServiceHandleDeviceNotificationTest` (3 erros de fixture `event missing 'stanza' subtree`) foi corrigido em 2026-11-27 nos 4 loaders (`DeviceFixtures`, `MessageFixtures`, `SyncFixtures`, `MigrationFixtures`), que passaram a ler `"node"` com fallback para `"stanza"`.
 
 ## Como continuar
 

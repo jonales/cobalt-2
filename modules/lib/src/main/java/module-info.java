@@ -65,7 +65,6 @@ module com.github.auties00.cobalt {
 
     // Generate messageContainer previews
     requires it.auties.linkpreview;
-    requires com.googlecode.ezvcard;
 
     // Message store
     requires com.github.auties00.collections;
@@ -102,7 +101,6 @@ module com.github.auties00.cobalt {
     requires com.github.auties00.cobalt.wam;
 
     // Mobile api
-    requires net.dongliu.apkparser;
     requires com.google.i18n.phonenumbers.libphonenumber;
 
     // Calls

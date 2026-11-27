@@ -19,11 +19,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
-                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
@@ -45,12 +41,10 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wam-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-source-meta</artifactId>
-            <version>${project.version}</version>
         </dependency>
     </dependencies>
 </project>

@@ -146,9 +146,12 @@ public final class SyncFixtures {
      */
     public static Stanza buildNodeFromEvent(JSONObject event) {
         Objects.requireNonNull(event, "event");
-        var nodeTree = event.getJSONObject("stanza");
+        var nodeTree = event.getJSONObject("node");
         if (nodeTree == null) {
-            throw new IllegalArgumentException("event missing 'stanza' subtree");
+            nodeTree = event.getJSONObject("stanza");
+        }
+        if (nodeTree == null) {
+            throw new IllegalArgumentException("event missing 'node'/'stanza' subtree");
         }
         return buildNode(nodeTree);
     }

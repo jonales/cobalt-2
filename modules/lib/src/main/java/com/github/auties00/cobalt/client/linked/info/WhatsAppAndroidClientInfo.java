@@ -6,10 +6,8 @@ import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.telemetry.log.Log;
 import com.github.auties00.cobalt.telemetry.log.LogRedactable;
 import com.github.auties00.cobalt.wire.linked.device.pairing.ClientAppVersion;
+import com.github.auties00.cobalt.util.ApkArchive;
 import com.github.auties00.cobalt.util.PlayStoreUtils;
-import net.dongliu.apk.parser.ByteArrayApkFile;
-import net.dongliu.apk.parser.bean.ApkSigner;
-import net.dongliu.apk.parser.bean.CertificateMeta;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -24,7 +22,6 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.cert.CertificateException;
 import java.util.Base64;
-import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.zip.ZipInputStream;
@@ -229,7 +226,7 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
      * download. When a cache entry exists for the current Play Store {@code versionCode} it is returned directly without
      * any download.
      *
-     * @implNote This implementation fully materialises the base APK into a {@link ByteArrayApkFile} because certificate
+     * @implNote This implementation fully materialises the base APK into an {@link ApkArchive} because certificate
      *           extraction needs random access to the APK Signing Block at the tail of the archive. Splits are stream
      *           scanned with {@link ZipInputStream} so they never have to be held in memory; non density splits and any
      *           split left unread once the {@code about_logo.png} is found are closed eagerly so the underlying HTTP
@@ -253,8 +250,8 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
             if (Log.DEBUG) {
                 LOGGER.log(Level.DEBUG, "downloading android apk for {0}, versionCode {1}", packageName, latest.code());
             }
-            try (var downloaded = PlayStoreUtils.downloadApk(packageName, latest.code());
-                 var baseApk = new ByteArrayApkFile(downloaded.baseApk().readAllBytes())) {
+            try (var downloaded = PlayStoreUtils.downloadApk(packageName, latest.code())) {
+                var baseApk = new ApkArchive(downloaded.baseApk().readAllBytes());
                 var aboutLogo = findAboutLogoInBase(baseApk);
                 if (aboutLogo == null) {
                     if (Log.DEBUG) {
@@ -282,13 +279,14 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
                     throw notFound;
                 }
 
-                var version = ClientAppVersion.of(baseApk.getApkMeta().getVersionName());
+                var manifest = baseApk.manifestMeta();
+                var version = ClientAppVersion.of(manifest.versionName());
 
                 var digest = MessageDigest.getInstance("MD5");
-                digest.update(baseApk.getFileData("classes.dex"));
+                digest.update(baseApk.getEntry("classes.dex"));
                 var md5Hash = digest.digest();
 
-                var secretKey = getSecretKey(baseApk.getApkMeta().getPackageName(), aboutLogo);
+                var secretKey = getSecretKey(manifest.packageName(), aboutLogo);
 
                 var certificates = getCertificates(baseApk);
 
@@ -417,11 +415,10 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
      *
      * @param baseApk the materialised base APK
      * @return the raw PNG bytes, or {@code null} when the base APK does not carry the drawable
-     * @throws IOException if reading an APK entry fails
      */
-    private static byte[] findAboutLogoInBase(ByteArrayApkFile baseApk) throws IOException {
+    private static byte[] findAboutLogoInBase(ApkArchive baseApk) {
         for (var path : ABOUT_LOGO_PATHS) {
-            var data = baseApk.getFileData(path);
+            var data = baseApk.getEntry(path);
             if (data != null) {
                 return data;
             }
@@ -432,7 +429,7 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
     /**
      * Stream scans a density configuration split for any {@link #ABOUT_LOGO_PATHS} entry and returns the first match.
      *
-     * @implNote This implementation uses {@link ZipInputStream} rather than {@link ByteArrayApkFile} so the caller never
+     * @implNote This implementation uses {@link ZipInputStream} rather than {@link ApkArchive} so the caller never
      *           has to materialise the full split in memory and can abort the underlying HTTP transfer as soon as the entry
      *           is located, simply by closing the stream.
      * @param stream the split's response body stream
@@ -463,13 +460,8 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
      * @throws IOException          if reading the signers metadata fails
      * @throws CertificateException if any certificate cannot be parsed
      */
-    private static byte[][] getCertificates(ByteArrayApkFile apkFile) throws IOException, CertificateException {
-        return apkFile.getApkSingers()
-                .stream()
-                .map(ApkSigner::getCertificateMetas)
-                .flatMap(Collection::stream)
-                .map(CertificateMeta::getData)
-                .toArray(byte[][]::new);
+    private static byte[][] getCertificates(ApkArchive apkFile) throws IOException, CertificateException {
+        return apkFile.signingCertificates();
     }
 
     /**

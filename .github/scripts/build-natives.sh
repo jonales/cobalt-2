@@ -103,21 +103,21 @@ OPUS_REPO=https://github.com/xiph/opus.git
 OPUS_REF=v1.5.2
 
 OPENH264_REPO=https://github.com/cisco/openh264.git
-OPENH264_REF=v2.4.1
+OPENH264_REF=v2.7.0
 
 LIBVPX_REPO=https://chromium.googlesource.com/webm/libvpx
-LIBVPX_REF=v1.15.1
+LIBVPX_REF=v1.17.0
 
 DAV1D_REPO=https://code.videolan.org/videolan/dav1d.git
-DAV1D_REF=1.4.3
+DAV1D_REF=1.5.5
 RAV1E_REPO=https://github.com/xiph/rav1e.git
 RAV1E_REF=v0.7.1
 
 LIBWEBP_REPO=https://chromium.googlesource.com/webm/libwebp
-LIBWEBP_REF=v1.5.0
+LIBWEBP_REF=v1.6.0
 
 FFMPEG_REPO=https://github.com/FFmpeg/FFmpeg.git
-FFMPEG_REF=n7.1
+FFMPEG_REF=n7.1.5
 
 WEBRTC_APM_REPO=https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git
 WEBRTC_APM_REF=v2.1
@@ -416,9 +416,9 @@ Cflags: -I\${includedir}
 EOF
     }
     emit_pc opus     opus     1.5.2  "$opus_inst/lib"  "$opus_inst/include/opus" "-lm"
-    emit_pc vpx      vpx      1.15.1 "$vpx_inst/lib"   "$vpx_inst/include"       "-lm -lpthread"
-    emit_pc openh264 openh264 2.4.1  "$h264_stage/lib" "$h264_stage/include"     "$CXXLIB -lm"
-    emit_pc libwebp  webp     1.5.0  "$webp_inst/lib"  "$webp_inst/include"      "-lsharpyuv -lm -lpthread"
+    emit_pc vpx      vpx      1.17.0 "$vpx_inst/lib"   "$vpx_inst/include"       "-lm -lpthread"
+    emit_pc openh264 openh264 2.7.0  "$h264_stage/lib" "$h264_stage/include"     "$CXXLIB -lm"
+    emit_pc libwebp  webp     1.6.0  "$webp_inst/lib"  "$webp_inst/include"      "-lsharpyuv -lm -lpthread"
 
     local b="$BUILD/build-ffmpeg/build"
     rm -rf "$b" && mkdir -p "$b"

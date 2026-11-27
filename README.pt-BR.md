@@ -32,6 +32,7 @@ publicado a partir deste repositório. Correções, validação e versões acont
 para as issues deste repositório.
 
 - **Correções achadas em testes ao vivo.** A maior parte do trabalho vem de rodar o Msgforge com celulares de verdade: reenvio de mensagem (retry), recusa de chamada, metadados de grupo, envio de vídeo e de nota de voz, foto da própria conta, status de contatos, logout que fecha a conexão, o nome configurado em "Aparelhos conectados", lista de aparelhos e o aviso de código de segurança (ICDC), sessões Signal pelo LID, entre outras. O estado de cada item fica em [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md), e o que ainda precisa de celular está em [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
+- **Stack LTS e observabilidade.** Usa **Java 25 LTS** com Maven `3.9.16` (wrapper), JUnit `6.1.3`, H2 MVStore `2.5.252`, Fastjson2 `2.0.66`, receitas nativas em FFmpeg `7.1.5` LTS, leitura de APK em Java puro (substituindo o `apk-parser` abandonado) e eventos nativos de métricas via JDK Flight Recorder (JFR) em `cobalt-telemetry-core`.
 - **Servido pelo JitPack.** Não há versão no Maven Central (veja [Instalação](#instalação)).
 
 O cobalt-2 deriva da biblioteca Cobalt, de Alessandro Autiero, publicada sob a licença MIT, cujo
@@ -117,6 +118,8 @@ mvn -Pnatives -Dnatives.classifier=linux-x86_64 package
 
 # fat jar autossuficiente: cobalt-lib-0.1.0-uber-<classifier>.jar (dependências + nativo)
 mvn -Puber-jar-linux-x86_64 package
+# ou parametrizado:
+mvn -Puber-jar-natives -Dnatives.classifier=linux-x86_64 package
 ```
 
 Classifiers: `linux-x86_64`, `linux-aarch64`, `darwin-x86_64`, `darwin-aarch64`, `windows-x86_64`, `windows-aarch64`.
@@ -314,13 +317,15 @@ Os listeners são registrados igual ao cliente Linked, e `sendMessage` recebe o 
 
 ## Desenvolvimento
 
-- Build: `mvn compile` na raiz (Java 25). A organização dos módulos e as regras de código estão no [`CLAUDE.md`](CLAUDE.md).
+- Build e testes: `./mvnw -B verify` na raiz (Java 25 LTS; `verify` empacota os módulos JPMS a montante no reactor). A organização dos módulos e as regras de código estão no [`CLAUDE.md`](CLAUDE.md).
+- CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa os testes unitários e a checagem de referências Javadoc em pushes e pull requests.
+- Métricas: `cobalt-telemetry-core` emite eventos JFR sem PII (`cobalt.Connection`, `cobalt.Stanza`, `cobalt.Message`, `cobalt.MediaTransfer`), inspecionáveis com ferramentas padrão do JDK Flight Recorder.
 - Revisão do motor: [`docs/engine-review/STATUS.md`](docs/engine-review/STATUS.md) lista o que está corrigido, validado, pendente ou ainda é hipótese; atualize-o junto com cada correção do motor.
 - A validação ao vivo precisa de celulares de verdade e não roda na nuvem: veja [`docs/engine-review/VALIDACAO.md`](docs/engine-review/VALIDACAO.md).
 
 ### Geradores de código
 
-Partes do cobalt-2 são regeneradas por extratores determinísticos que rodam contra o WhatsApp Web real (cada um é um projeto Node: `npm install`, `npm run build`, `npm start`):
+Partes do cobalt-2 são regeneradas por extratores determinísticos que rodam contra o WhatsApp Web real (cada um é um projeto Node `>=24` LTS: `npm install`, `npm run build`, `npm start`):
 
 - [tools/web/proto-extractor](tools/web/proto-extractor): extrai todas as mensagens e enums protobuf para `whatsapp.proto`, a referência dos modelos escritos à mão em [modules/wire](modules/wire).
 - [tools/web/ab-props-codegen](tools/web/ab-props-codegen): regenera as constantes `ABProp` em `modules/wire/wire-linked`.

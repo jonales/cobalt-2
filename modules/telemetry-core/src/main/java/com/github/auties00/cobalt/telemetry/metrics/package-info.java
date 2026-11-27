@@ -2,10 +2,9 @@
  * Defines Cobalt's metrics telemetry, the second telemetry pillar alongside the logging facade in
  * {@code com.github.auties00.cobalt.telemetry.log}.
  *
- * <p>Metrics are surfaced as JFR (JDK Flight Recorder) events, so an application can record and analyse
- * Cobalt's runtime behaviour with the standard JDK tooling without Cobalt shipping its own metrics pipeline.
- *
- * <p>TODO: this package is a placeholder for the metrics half of {@code cobalt-telemetry-core}; the JFR event
- * definitions are not yet implemented.
+ * <p>Metrics are surfaced as JFR (JDK Flight Recorder) events so applications can record and analyse
+ * Cobalt's runtime behaviour (connection lifecycle, stanza round-trips, message throughput, and media
+ * transfers) with standard JDK tooling without shipping an external metrics pipeline. All event fields are
+ * privacy-safe and never carry raw PII, phone numbers, JIDs, or message bodies.
  */
 package com.github.auties00.cobalt.telemetry.metrics;

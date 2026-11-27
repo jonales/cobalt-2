@@ -1,19 +1,21 @@
 /**
  * Defines the telemetry facade for Cobalt.
  *
- * <p>This module is used by every other module to emit privacy-redacted diagnostics: sensitive values (phone
- * numbers, JIDs, tokens, codes, and key material) are masked to non-reversible, still-correlatable tokens
- * before a record reaches any sink, so they never appear in the clear, while ordinary values pass through
- * untouched. It is a dependency-free leaf that everything else can depend on, and redaction can be turned off
- * for trusted local debugging.
+ * <p>This module provides two dependency-free observability pillars: privacy-redacted logging in
+ * {@code com.github.auties00.cobalt.telemetry.log} and JDK Flight Recorder (JFR) metrics events in
+ * {@code com.github.auties00.cobalt.telemetry.metrics}. Sensitive values (phone numbers, JIDs, tokens,
+ * codes, and key material) are masked before reaching any sink.
  */
 module com.github.auties00.cobalt.telemetry {
     // JUL is the backing logging framework
     requires java.logging;
 
+    // JFR backs the metrics pillar without external dependencies
+    requires jdk.jfr;
+
     // Logs: the Log facade, the redaction engine, and the LogRedactable contract
     exports com.github.auties00.cobalt.telemetry.log;
 
-    // TODO: metrics -- the com.github.auties00.cobalt.telemetry.metrics package will hold the JFR event
-    //       definitions (the second telemetry pillar), not yet implemented, so it is not exported yet
+    // Metrics: JFR event definitions for connection, stanza, message, and media telemetry
+    exports com.github.auties00.cobalt.telemetry.metrics;
 }

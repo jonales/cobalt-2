@@ -19,11 +19,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
-                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
@@ -40,17 +36,14 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>${protoc.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>collections</artifactId>
-            <version>${collections.version}</version>
         </dependency>
     </dependencies>
 </project>

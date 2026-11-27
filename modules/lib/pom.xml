@@ -20,6 +20,7 @@
             <build>
                 <plugins>
                     <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>
                         <configuration>
                             <descriptorRefs>
@@ -98,11 +99,9 @@
             with no transitive Maven deps and no runtime GitHub download of the
             binary.
 
-            Each profile only sets `${natives.classifier}`; the shared
-            src/main/assembly/uber-jar-natives.xml descriptor packs the native
-            under the repo-relative path the loader probes on the classpath and
-            names the output `cobalt-lib-${project.version}-uber-<classifier>.jar`.
-
+            Can be invoked either with the parameterized profile:
+                mvn -Puber-jar-natives -Dnatives.classifier=linux-x86_64 package
+            or via the convenience per-classifier profiles:
                 mvn -Puber-jar-linux-x86_64    package
                 mvn -Puber-jar-linux-aarch64   package
                 mvn -Puber-jar-darwin-x86_64   package
@@ -110,11 +109,28 @@
                 mvn -Puber-jar-windows-x86_64  package
                 mvn -Puber-jar-windows-aarch64 package
 
-            The native for a classifier must be present under
-            natives/bin/<classifier>/ (built by .github/scripts/build-natives.sh);
-            when absent the descriptor still produces a JAR, but binary-free,
-            and the loader falls back to its runtime download.
+            All profiles share the `uber-jar-natives` execution configured in
+            pluginManagement below (with phase=none by default) and simply
+            activate it in the `package` phase.
         -->
+        <profile>
+            <id>uber-jar-natives</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>uber-jar-natives</id>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <profile>
             <id>uber-jar-linux-x86_64</id>
             <properties>
@@ -129,15 +145,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -159,15 +166,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -189,15 +187,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -219,15 +208,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -249,15 +229,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -279,15 +250,6 @@
                             <execution>
                                 <id>uber-jar-natives</id>
                                 <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                                <configuration>
-                                    <appendAssemblyId>true</appendAssemblyId>
-                                    <descriptors>
-                                        <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
-                                    </descriptors>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -322,15 +284,35 @@
             </testResource>
         </testResources>
 
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>uber-jar-natives</id>
+                            <phase>none</phase>
+                            <goals>
+                                <goal>single</goal>
+                            </goals>
+                            <configuration>
+                                <appendAssemblyId>true</appendAssemblyId>
+                                <descriptors>
+                                    <descriptor>${project.basedir}/src/main/assembly/uber-jar-natives.xml</descriptor>
+                                </descriptors>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
-                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <annotationProcessorPath>
                             <groupId>com.github.auties00</groupId>
@@ -354,24 +336,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${maven.surefire.plugin.version}</version>
                 <configuration>
                     <argLine>--add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-engine</artifactId>
-                        <version>${junit.version}</version>
-                    </dependency>
-                </dependencies>
             </plugin>
 
             <!-- Used by /validate scratch validators in src/test/java to invoke a main() against the test classpath. -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
                 <configuration>
                     <classpathScope>test</classpathScope>
                     <commandlineArgs>--add-modules jdk.incubator.vector --add-opens java.base/jdk.internal.misc=ALL-UNNAMED</commandlineArgs>
@@ -385,93 +358,82 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-source-meta</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- WhatsApp protobuf data model -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-linked</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-stanza-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-telemetry-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-cloud</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-wam</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-stanza</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-graphql</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wire-push</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- WAM annotation processor and types -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>cobalt-wam-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <!-- Generate and print QR code (Web API) -->
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>javase</artifactId>
-            <version>${zxing.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>qr-terminal</artifactId>
-            <version>${qr.terminal.version}</version>
         </dependency>
 
         <!-- Cryptography (used by Whatsapp) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>libsignal</artifactId>
-            <version>${libsignal.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>curve25519</artifactId>
-            <version>${curve25519.version}</version>
         </dependency>
 
         <!-- BouncyCastle (test only: cross-checks the pure-JDK crypto/cert/DTLS against a second provider) -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
-            <version>${bouncycastle.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bctls-jdk18on</artifactId>
-            <version>${bouncycastle.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -479,102 +441,72 @@
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>protobuf-base</artifactId>
-            <version>${protoc.version}</version>
         </dependency>
 
         <!-- JSON serialization (used by Whatsapp) -->
         <dependency>
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
-            <version>${json.version}</version>
         </dependency>
 
         <!-- Parse phone numbers (Mobile API) -->
         <dependency>
             <groupId>com.googlecode.libphonenumber</groupId>
             <artifactId>libphonenumber</artifactId>
-            <version>${libphonenumber.version}</version>
-        </dependency>
-
-        <!-- Parse Android APK (Mobile API) -->
-        <dependency>
-            <groupId>net.dongliu</groupId>
-            <artifactId>apk-parser</artifactId>
-            <version>${apk.parser.version}</version>
         </dependency>
 
         <!-- Generate message previews -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>link-preview</artifactId>
-            <version>${linkpreview.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.googlecode.ez-vcard</groupId>
-            <artifactId>ez-vcard</artifactId>
-            <version>${vcard.version}</version>
         </dependency>
 
         <!-- Store messages in memory -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>collections</artifactId>
-            <version>1.0.0</version>
         </dependency>
 
         <!-- Persistent message store (embedded H2 MVStore, pure Java) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2-mvstore</artifactId>
-            <version>${h2.mvstore.version}</version>
         </dependency>
 
         <!-- PDF rendering for document thumbnails in the upload transcoder -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>${pdfbox.version}</version>
         </dependency>
 
         <!-- Event-driven network connectivity monitor (FFM, jextract bindings) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>vigil</artifactId>
-            <version>${vigil.version}</version>
         </dependency>
 
         <!-- Native OS passkey (WebAuthn) assertion (FFM, jextract bindings) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>warden</artifactId>
-            <version>${warden.version}</version>
         </dependency>
 
         <!-- Pure-Java SRTP/SRTCP (replaces the native libsrtp shim) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>srtp</artifactId>
-            <version>${srtp.version}</version>
         </dependency>
 
         <!-- Pure-Java SCTP for WebRTC Data Channels (replaces the native usrsctp shim) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>sctp</artifactId>
-            <version>${sctp.version}</version>
         </dependency>
 
         <!-- Testing framework -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -582,7 +514,6 @@
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
-            <version>${selenium.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -590,20 +521,11 @@
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-core</artifactId>
-            <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
-            <version>${jmh.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk18on</artifactId>
-            <version>${bouncycastle.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

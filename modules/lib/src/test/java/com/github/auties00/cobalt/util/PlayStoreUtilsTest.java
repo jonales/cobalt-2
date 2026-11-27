@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.util;
 
-import net.dongliu.apk.parser.ByteArrayApkFile;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -52,11 +51,10 @@ public class PlayStoreUtilsTest {
     }
 
     private static void assertApkPackage(String expectedPackage, String label, InputStream stream) throws IOException {
-        try (var parsed = new ByteArrayApkFile(stream.readAllBytes())) {
-            var meta = parsed.getApkMeta();
-            assertNotNull(meta, () -> expectedPackage + "/" + label + " has no parseable ApkMeta");
-            assertEquals(expectedPackage, meta.getPackageName(),
-                    () -> expectedPackage + "/" + label + " has unexpected package name");
-        }
+        var parsed = new ApkArchive(stream.readAllBytes());
+        var meta = parsed.manifestMeta();
+        assertNotNull(meta, () -> expectedPackage + "/" + label + " has no parseable manifest metadata");
+        assertEquals(expectedPackage, meta.packageName(),
+                () -> expectedPackage + "/" + label + " has unexpected package name");
     }
 }

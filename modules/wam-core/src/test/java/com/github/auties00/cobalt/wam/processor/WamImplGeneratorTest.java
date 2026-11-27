@@ -246,11 +246,27 @@ class WamImplGeneratorTest {
             var sources = List.of(
                     sourceFile("generatortest.SyntheticEvent", SYNTHETIC_EVENT_SOURCE),
                     sourceFile("generatortest.SyntheticEnum", SYNTHETIC_ENUM_SOURCE));
+            var options = new ArrayList<String>();
+            options.add("--release");
+            options.add("25");
+            var paths = new ArrayList<String>();
+            var classPath = System.getProperty("java.class.path");
+            if (classPath != null && !classPath.isBlank()) {
+                paths.add(classPath);
+            }
+            var modulePath = System.getProperty("jdk.module.path");
+            if (modulePath != null && !modulePath.isBlank()) {
+                paths.add(modulePath);
+            }
+            if (!paths.isEmpty()) {
+                options.add("-classpath");
+                options.add(String.join(java.io.File.pathSeparator, paths));
+            }
             var task = compiler.getTask(
                     null,
                     captured,
                     diagnostics::add,
-                    List.of("--enable-preview", "--release", "25"),
+                    options,
                     null,
                     sources);
             task.setProcessors(List.of(new WamEventProcessor()));

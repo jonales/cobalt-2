@@ -39,17 +39,6 @@
         <developerConnection>scm:git:ssh://git@github.com/jonales/cobalt-2.git</developerConnection>
     </scm>
 
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
-
     <repositories>
         <repository>
             <id>jitpack.io</id>
@@ -61,37 +50,277 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>25</java.version>
-        <maven.surefire.plugin.version>3.0.0-M9</maven.surefire.plugin.version>
-        <maven.gpg.plugin.version>3.0.1</maven.gpg.plugin.version>
-        <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
-        <maven.source.plugin.version>3.2.1</maven.source.plugin.version>
-        <maven.javadoc.plugin.version>3.5.0</maven.javadoc.plugin.version>
-        <maven.staging.plugin.version>0.8.0</maven.staging.plugin.version>
-        <zxing.version>3.5.1</zxing.version>
-        <json.version>2.0.57</json.version>
+        <maven.surefire.plugin.version>3.6.1</maven.surefire.plugin.version>
+        <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
+        <maven.compiler.plugin.version>3.16.0</maven.compiler.plugin.version>
+        <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
+        <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
+        <maven.assembly.plugin.version>3.8.0</maven.assembly.plugin.version>
+        <maven.staging.plugin.version>0.12.0</maven.staging.plugin.version>
+        <exec.maven.plugin.version>3.7.0</exec.maven.plugin.version>
+        <zxing.version>3.5.4</zxing.version>
+        <json.version>2.0.66</json.version>
         <protoc.version>3.4.5</protoc.version>
-        <junit.version>5.10.0-M1</junit.version>
+        <junit.version>6.1.3</junit.version>
         <libsignal.version>0.0.5</libsignal.version>
         <curve25519.version>3.0.1</curve25519.version>
         <linkpreview.version>2.3</linkpreview.version>
-        <vcard.version>0.12.1</vcard.version>
+        <vcard.version>0.12.2</vcard.version>
         <qr.terminal.version>3.0</qr.terminal.version>
-        <libphonenumber.version>9.0.4</libphonenumber.version>
-        <maven.versions.version>2.15.0</maven.versions.version>
-        <sl4j.version>2.0.13</sl4j.version>
-        <apk.parser.version>2.6.10</apk.parser.version>
+        <libphonenumber.version>9.0.44</libphonenumber.version>
         <collections.version>1.0.0</collections.version>
-        <javapoet.version>0.6.0</javapoet.version>
+        <javapoet.version>0.23.0</javapoet.version>
         <jmh.version>1.37</jmh.version>
-        <selenium.version>4.27.0</selenium.version>
-        <bouncycastle.version>1.80</bouncycastle.version>
-        <pdfbox.version>3.0.5</pdfbox.version>
-        <h2.mvstore.version>2.3.232</h2.mvstore.version>
+        <selenium.version>4.54.0</selenium.version>
+        <bouncycastle.version>1.87</bouncycastle.version>
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <h2.mvstore.version>2.5.252</h2.mvstore.version>
         <vigil.version>1.0.0</vigil.version>
         <warden.version>1.1.0</warden.version>
         <srtp.version>1.0.0</srtp.version>
         <sctp.version>1.0.0</sctp.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Internal Cobalt modules -->
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-source-meta</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-telemetry-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-stanza-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wam-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-linked</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-cloud</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-wam</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-stanza</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-graphql</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>cobalt-wire-push</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- External dependencies -->
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>protobuf-base</artifactId>
+                <version>${protoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>libsignal</artifactId>
+                <version>${libsignal.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>curve25519</artifactId>
+                <version>${curve25519.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>qr-terminal</artifactId>
+                <version>${qr.terminal.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>link-preview</artifactId>
+                <version>${linkpreview.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>collections</artifactId>
+                <version>${collections.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>vigil</artifactId>
+                <version>${vigil.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>warden</artifactId>
+                <version>${warden.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>srtp</artifactId>
+                <version>${srtp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.auties00</groupId>
+                <artifactId>sctp</artifactId>
+                <version>${sctp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${json.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>${zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.googlecode.libphonenumber</groupId>
+                <artifactId>libphonenumber</artifactId>
+                <version>${libphonenumber.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.googlecode.ez-vcard</groupId>
+                <artifactId>ez-vcard</artifactId>
+                <version>${vcard.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2-mvstore</artifactId>
+                <version>${h2.mvstore.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.palantir.javapoet</groupId>
+                <artifactId>javapoet</artifactId>
+                <version>${javapoet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bctls-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.seleniumhq.selenium</groupId>
+                <artifactId>selenium-java</artifactId>
+                <version>${selenium.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven.compiler.plugin.version}</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven.surefire.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven.assembly.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven.source.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven.javadoc.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>${maven.gpg.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.sonatype.central</groupId>
+                    <artifactId>central-publishing-maven-plugin</artifactId>
+                    <version>${maven.staging.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>${exec.maven.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
     <profiles>
         <!--
@@ -137,7 +366,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>3.11.2</version>
+                        <version>${maven.javadoc.plugin.version}</version>
                         <configuration>
                             <source>${java.version}</source>
                             <show>private</show>

@@ -68,6 +68,7 @@ import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.listener.linked.internal.InternalLinkedListener;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
 import com.github.auties00.cobalt.telemetry.log.Log;
+import com.github.auties00.cobalt.telemetry.metrics.CobaltConnectionEvent;
 import com.github.auties00.cobalt.media.LiveMediaConnectionService;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
@@ -338,7 +339,7 @@ import com.github.auties00.cobalt.stream.LiveNodeStreamService;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.*;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.sync.factory.*;
+import com.github.auties00.cobalt.sync.factory.AppStateMutationRegistry;
 import com.github.auties00.cobalt.sync.handler.AiThreadDeleteHandler;
 import com.github.auties00.cobalt.sync.handler.BusinessBroadcastAssociationHandler;
 import com.github.auties00.cobalt.sync.handler.PinChatHandler;
@@ -355,7 +356,7 @@ import com.github.auties00.cobalt.wam.threadlogging.LiveThreadLoggingService;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingMessages;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingService;
-import com.github.auties00.cobalt.wam.synthetic.*;
+import com.github.auties00.cobalt.wam.synthetic.SyntheticTelemetryHub;
 import com.github.auties00.cobalt.wire.wam.type.*;
 import com.github.auties00.cobalt.wire.wam.type.MediaType;
 import com.github.auties00.curve25519.Curve25519;
@@ -608,69 +609,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private final CtwaConversionSignalService ctwaConversionSignalService;
     /**
-     * The synthetic-telemetry emitter that reports the business-account snapshot once per connect.
+     * Hub coordinating all per-connect synthetic telemetry snapshots.
      */
-    private final SyntheticBusinessTelemetry syntheticBusinessTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the messaging-subsystem snapshot once per connect.
-     */
-    private final SyntheticMessagingTelemetry syntheticMessagingTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the browser-performance snapshot once per connect.
-     */
-    private final SyntheticBrowserPerfTelemetry browserPerfTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the media-subsystem snapshot once per connect.
-     */
-    private final SyntheticMediaTelemetry syntheticMediaTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the privacy-and-safety snapshot once per connect.
-     */
-    private final SyntheticPrivacySafetyTelemetry syntheticPrivacySafetyTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the UI-interaction snapshot once per connect.
-     */
-    private final SyntheticUiInteractionTelemetry syntheticUiInteractionTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the group-and-community snapshot once per connect.
-     */
-    private final SyntheticGroupTelemetry syntheticGroupTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the settings snapshot once per connect.
-     */
-    private final SyntheticSettingsTelemetry settingsTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the channel snapshot once per connect.
-     */
-    private final SyntheticChannelTelemetry syntheticChannelTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the status snapshot once per connect.
-     */
-    private final SyntheticStatusTelemetry syntheticStatusTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the user-activity snapshot once per connect.
-     */
-    private final SyntheticUserActivityTelemetry userActivityTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the AI-bot snapshot once per connect.
-     */
-    private final SyntheticAiBotTelemetry syntheticAiBotTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the contacts snapshot once per connect.
-     */
-    private final SyntheticContactsTelemetry syntheticContactsTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the crash snapshot once per connect.
-     */
-    private final SyntheticCrashTelemetry syntheticCrashTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the voice-note snapshot once per connect.
-     */
-    private final SyntheticVoiceNoteTelemetry voiceNoteTelemetry;
-    /**
-     * The synthetic-telemetry emitter that reports the call snapshot once per connect.
-     */
-    private final SyntheticCallTelemetry syntheticCallTelemetry;
+    private final SyntheticTelemetryHub syntheticTelemetryHub;
     /**
      * The per-protocol backoff registry consulted before every USync
      * dispatch and updated when the relay returns an
@@ -700,179 +641,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private final SnapshotRecoveryService snapshotRecoveryService;
     /**
-     * Factory that builds outgoing pin-chat sync mutations.
+     * Registry holding every outgoing app-state (syncd) mutation factory.
      */
-    private final PinChatMutationFactory pinChatMutationFactory;
-    /**
-     * Factory that builds outgoing mute-chat sync mutations.
-     */
-    private final MuteChatMutationFactory muteChatMutationFactory;
-    /**
-     * Factory that builds outgoing archive-chat sync mutations.
-     */
-    private final ArchiveChatMutationFactory archiveChatMutationFactory;
-    /**
-     * Factory that builds outgoing mark-chat-as-read sync mutations.
-     */
-    private final MarkChatAsReadMutationFactory markChatAsReadMutationFactory;
-    /**
-     * Factory that builds outgoing clear-chat sync mutations.
-     */
-    private final ClearChatMutationFactory clearChatMutationFactory;
-    /**
-     * Factory that builds outgoing delete-chat sync mutations.
-     */
-    private final DeleteChatMutationFactory deleteChatMutationFactory;
-    /**
-     * Factory that builds outgoing lock-chat sync mutations.
-     */
-    private final LockChatMutationFactory lockChatMutationFactory;
-    /**
-     * Factory that builds outgoing label-edit sync mutations.
-     */
-    private final LabelEditMutationFactory labelEditMutationFactory;
-    /**
-     * Factory that builds outgoing label-jid association sync mutations.
-     */
-    private final LabelAssociationMutationFactory labelAssociationMutationFactory;
-    /**
-     * Factory that builds outgoing label-reordering sync mutations.
-     */
-    private final LabelReorderingMutationFactory labelReorderingMutationFactory;
-    /**
-     * Factory that builds outgoing quick-reply sync mutations.
-     */
-    private final QuickReplyMutationFactory quickReplyMutationFactory;
-    /**
-     * Factory that builds outgoing chat-assignment sync mutations.
-     */
-    private final ChatAssignmentMutationFactory chatAssignmentMutationFactory;
-    /**
-     * Factory that builds outgoing chat-assignment-opened-status sync mutations.
-     */
-    private final ChatAssignmentOpenedStatusMutationFactory chatAssignmentOpenedStatusMutationFactory;
-    /**
-     * Factory that builds outgoing business-broadcast-list sync mutations.
-     */
-    private final BusinessBroadcastListMutationFactory businessBroadcastListMutationFactory;
-    /**
-     * Factory that builds outgoing business-broadcast-campaign sync mutations.
-     */
-    private final BusinessBroadcastCampaignMutationFactory businessBroadcastCampaignMutationFactory;
-    /**
-     * Factory that builds outgoing favourite-sticker sync mutations.
-     */
-    private final FavoriteStickerMutationFactory favoriteStickerMutationFactory;
-    /**
-     * Factory that builds outgoing remove-recent-sticker sync mutations.
-     */
-    private final RemoveRecentStickerMutationFactory removeRecentStickerMutationFactory;
-    /**
-     * Factory that builds outgoing bot-welcome-request sync mutations.
-     */
-    private final BotWelcomeRequestMutationFactory botWelcomeRequestMutationFactory;
-    /**
-     * Factory that builds outgoing AI-thread-rename sync mutations.
-     */
-    private final AiThreadRenameMutationFactory aiThreadRenameMutationFactory;
-    /**
-     * Factory that builds outgoing AI-thread-delete sync mutations.
-     */
-    private final AiThreadDeleteMutationFactory aiThreadDeleteMutationFactory;
-    /**
-     * Factory that builds outgoing favourites sync mutations.
-     */
-    private final FavoritesMutationFactory favoritesMutationFactory;
-    /**
-     * Factory that builds outgoing note-edit sync mutations.
-     */
-    private final NoteEditMutationFactory noteEditMutationFactory;
-    /**
-     * Factory that builds outgoing locale-setting sync mutations.
-     */
-    private final LocaleSettingMutationFactory localeSettingMutationFactory;
-    /**
-     * Factory that builds outgoing disable-link-previews sync mutations.
-     */
-    private final DisableLinkPreviewsMutationFactory disableLinkPreviewsMutationFactory;
-    /**
-     * Factory that builds outgoing time-format sync mutations.
-     */
-    private final TimeFormatMutationFactory timeFormatMutationFactory;
-    /**
-     * Factory that builds outgoing Maiba-AI-features-control sync mutations.
-     */
-    private final MaibaAIFeaturesControlMutationFactory maibaAIFeaturesControlMutationFactory;
-    /**
-     * Factory that builds outgoing unarchive-chats-setting sync mutations.
-     */
-    private final UnarchiveChatsSettingMutationFactory unarchiveChatsSettingMutationFactory;
-    /**
-     * Factory that builds outgoing notification-activity-setting sync mutations.
-     */
-    private final NotificationActivitySettingMutationFactory notificationActivitySettingMutationFactory;
-    /**
-     * Factory that builds outgoing status-privacy sync mutations.
-     */
-    private final StatusPrivacyMutationFactory statusPrivacyMutationFactory;
-    /**
-     * Factory that builds outgoing push-name-setting sync mutations.
-     */
-    private final PushNameSettingMutationFactory pushNameSettingMutationFactory;
-    /**
-     * Factory that builds outgoing contact-action sync mutations.
-     */
-    private final ContactActionMutationFactory contactActionMutationFactory;
-    /**
-     * Factory that builds outgoing call-log sync mutations.
-     */
-    private final CallLogMutationFactory callLogMutationFactory;
+    private final AppStateMutationRegistry mutationFactories;
     /**
      * The calls outbound call-log sync, recording each ended call into the runtime call-history table and
      * pushing the {@code call_log} app-state mutation, bound onto the engine's lifecycle controller so a
      * call end is logged and replicated.
      */
     private final CallLogSync callsCallLogSync;
-    /**
-     * Factory that builds outgoing NUX (onboarding-hint) sync mutations.
-     */
-    private final NuxActionMutationFactory nuxActionMutationFactory;
-    /**
-     * Factory that builds outgoing always-relay-calls sync mutations.
-     */
-    private final VoipRelayAllCallsMutationFactory voipRelayAllCallsMutationFactory;
-    /**
-     * Factory that builds outgoing custom-payment-methods sync mutations.
-     */
-    private final CustomPaymentMethodsMutationFactory customPaymentMethodsMutationFactory;
-    /**
-     * Factory that builds outgoing payment-terms-of-service sync mutations.
-     */
-    private final PaymentTosMutationFactory paymentTosMutationFactory;
-    /**
-     * Factory that builds outgoing CTWA per-customer data-sharing sync mutations.
-     */
-    private final CtwaPerCustomerDataSharingMutationFactory ctwaPerCustomerDataSharingMutationFactory;
-    /**
-     * Factory that builds outgoing Web/Desktop beta opt-in sync mutations.
-     */
-    private final ExternalWebBetaMutationFactory externalWebBetaMutationFactory;
-    /**
-     * Factory that builds outgoing Private Processing privacy sync mutations.
-     */
-    private final PrivateProcessingSettingMutationFactory privateProcessingSettingMutationFactory;
-    /**
-     * Factory that builds outgoing automated-detections sync mutations.
-     */
-    private final DetectedOutcomesStatusMutationFactory detectedOutcomesStatusMutationFactory;
-    /**
-     * Factory that builds outgoing interactive-message disable-button sync mutations.
-     */
-    private final InteractiveMessageMutationFactory interactiveMessageMutationFactory;
-    /**
-     * Factory that builds outgoing recent-emoji-usage sync mutations.
-     */
-    private final RecentEmojiWeightsMutationFactory recentEmojiWeightsMutationFactory;
     /**
      * The live socket to the WhatsApp server, or {@code null} when the
      * client is not connected.
@@ -1059,69 +836,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.dailyStatsService = new LiveDailyStatsService(this, wamService);
         this.threadLoggingService = new LiveThreadLoggingService(this, wamService);
         this.ctwaConversionSignalService = new LiveCtwaConversionSignalService(this, wamService, abPropsService);
-        this.syntheticBusinessTelemetry = new SyntheticBusinessTelemetry(this, wamService);
-        this.syntheticMessagingTelemetry = new SyntheticMessagingTelemetry(this, wamService);
-        this.browserPerfTelemetry = new SyntheticBrowserPerfTelemetry(this, wamService);
-        this.syntheticMediaTelemetry = new SyntheticMediaTelemetry(this, wamService);
-        this.syntheticPrivacySafetyTelemetry = new SyntheticPrivacySafetyTelemetry(this, wamService);
-        this.syntheticUiInteractionTelemetry = new SyntheticUiInteractionTelemetry(this, wamService);
-        this.syntheticGroupTelemetry = new SyntheticGroupTelemetry(this, wamService);
-        this.settingsTelemetry = new SyntheticSettingsTelemetry(this, wamService);
-        this.syntheticChannelTelemetry = new SyntheticChannelTelemetry(this, wamService);
-        this.syntheticStatusTelemetry = new SyntheticStatusTelemetry(this, wamService);
-        this.userActivityTelemetry = new SyntheticUserActivityTelemetry(this, wamService);
-        this.syntheticAiBotTelemetry = new SyntheticAiBotTelemetry(this, wamService);
-        this.syntheticContactsTelemetry = new SyntheticContactsTelemetry(this, wamService);
-        this.syntheticCrashTelemetry = new SyntheticCrashTelemetry(this, wamService);
-        this.voiceNoteTelemetry = new SyntheticVoiceNoteTelemetry(this, wamService);
-        this.syntheticCallTelemetry = new SyntheticCallTelemetry(this, wamService);
+        this.syntheticTelemetryHub = new SyntheticTelemetryHub(this, wamService);
         this.botSignatureVerificationService = new LiveBotSignatureVerificationService(abPropsService, wamService, botCertificateRevocationService);
         this.quarantineService = new LiveQuarantineService(this, abPropsService, wamService);
         this.snapshotRecoveryService = new LiveSnapshotRecoveryService(this, abPropsService, wamService);
         this.lidMigrationService = new LiveLidMigrationService(this, abPropsService, wamService);
         this.webAppStateService = new LiveWebAppStateService(this, abPropsService, lidMigrationService, snapshotRecoveryService, wamService, mediaConnectionService);
-        this.pinChatMutationFactory = new PinChatMutationFactory(wamService);
-        this.archiveChatMutationFactory = new ArchiveChatMutationFactory(pinChatMutationFactory);
-        this.muteChatMutationFactory = new MuteChatMutationFactory(abPropsService);
-        this.markChatAsReadMutationFactory = new MarkChatAsReadMutationFactory();
-        this.clearChatMutationFactory = new ClearChatMutationFactory();
-        this.deleteChatMutationFactory = new DeleteChatMutationFactory();
-        this.lockChatMutationFactory = new LockChatMutationFactory(archiveChatMutationFactory, pinChatMutationFactory);
-        this.labelEditMutationFactory = new LabelEditMutationFactory();
-        this.labelAssociationMutationFactory = new LabelAssociationMutationFactory();
-        this.labelReorderingMutationFactory = new LabelReorderingMutationFactory();
-        this.quickReplyMutationFactory = new QuickReplyMutationFactory();
-        this.chatAssignmentMutationFactory = new ChatAssignmentMutationFactory();
-        this.chatAssignmentOpenedStatusMutationFactory = new ChatAssignmentOpenedStatusMutationFactory();
-        this.businessBroadcastListMutationFactory = new BusinessBroadcastListMutationFactory();
-        this.businessBroadcastCampaignMutationFactory = new BusinessBroadcastCampaignMutationFactory(wamService);
-        this.favoriteStickerMutationFactory = new FavoriteStickerMutationFactory();
-        this.removeRecentStickerMutationFactory = new RemoveRecentStickerMutationFactory();
-        this.botWelcomeRequestMutationFactory = new BotWelcomeRequestMutationFactory(wamService);
-        this.aiThreadRenameMutationFactory = new AiThreadRenameMutationFactory(this, wamService);
-        this.aiThreadDeleteMutationFactory = new AiThreadDeleteMutationFactory();
-        this.favoritesMutationFactory = new FavoritesMutationFactory();
-        this.noteEditMutationFactory = new NoteEditMutationFactory();
-        this.localeSettingMutationFactory = new LocaleSettingMutationFactory();
-        this.disableLinkPreviewsMutationFactory = new DisableLinkPreviewsMutationFactory();
-        this.timeFormatMutationFactory = new TimeFormatMutationFactory();
-        this.maibaAIFeaturesControlMutationFactory = new MaibaAIFeaturesControlMutationFactory();
-        this.unarchiveChatsSettingMutationFactory = new UnarchiveChatsSettingMutationFactory();
-        this.notificationActivitySettingMutationFactory = new NotificationActivitySettingMutationFactory();
-        this.statusPrivacyMutationFactory = new StatusPrivacyMutationFactory();
-        this.pushNameSettingMutationFactory = new PushNameSettingMutationFactory();
-        this.contactActionMutationFactory = new ContactActionMutationFactory();
-        this.callLogMutationFactory = new CallLogMutationFactory();
-        this.nuxActionMutationFactory = new NuxActionMutationFactory();
-        this.voipRelayAllCallsMutationFactory = new VoipRelayAllCallsMutationFactory();
-        this.customPaymentMethodsMutationFactory = new CustomPaymentMethodsMutationFactory();
-        this.paymentTosMutationFactory = new PaymentTosMutationFactory();
-        this.ctwaPerCustomerDataSharingMutationFactory = new CtwaPerCustomerDataSharingMutationFactory();
-        this.externalWebBetaMutationFactory = new ExternalWebBetaMutationFactory();
-        this.privateProcessingSettingMutationFactory = new PrivateProcessingSettingMutationFactory();
-        this.detectedOutcomesStatusMutationFactory = new DetectedOutcomesStatusMutationFactory();
-        this.interactiveMessageMutationFactory = new InteractiveMessageMutationFactory();
-        this.recentEmojiWeightsMutationFactory = new RecentEmojiWeightsMutationFactory();
+        this.mutationFactories = new AppStateMutationRegistry(this, abPropsService, wamService);
         this.inactiveGroupLidMigrationService = new LiveInactiveGroupLidMigrationService(this, abPropsService);
         this.deviceService = new LiveDeviceService(this, webAppStateService, abPropsService, sessionCipher, wamService);
         this.messageService = new LiveMessageService(this, messageEncryption, messageDecryption, deviceService, lidMigrationService, abPropsService, wamService, mediaTranscoderService);
@@ -1130,7 +851,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
         this.shortcakePairingService = new LiveShortcakePairingService(this, webVerificationHandler, passkeyAuthenticator);
         var callsEventBus = new LiveCallEventBus(this);
-        this.callsCallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
+        this.callsCallLogSync = new CallLogSync(this, mutationFactories.callLog(), webAppStateService);
         this.callsService = new LiveCallsService(this, wamService, messageService, messageEncryption, deviceService, store, abPropsService, callsEventBus, callsCallLogSync);
         var ackSender = new AckSender(this);
         this.nodeStreamService = new LiveNodeStreamService(this, callsService, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, shortcakePairingService, ackSender, mediaConnectionService, tosService, quarantineService, passkeyAuthenticator);
@@ -1304,22 +1025,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         keepAliveService.start();
         dailyStatsService.start();
         threadLoggingService.start();
-        syntheticBusinessTelemetry.emitSessionTelemetry();
-        syntheticMessagingTelemetry.emitSessionTelemetry();
-        browserPerfTelemetry.emitSessionTelemetry();
-        syntheticMediaTelemetry.emitSessionTelemetry();
-        syntheticPrivacySafetyTelemetry.emitPrivacySafetyTelemetry();
-        syntheticUiInteractionTelemetry.emitSessionTelemetry();
-        syntheticGroupTelemetry.emitGroupTelemetry();
-        settingsTelemetry.emitSettingsTelemetry();
-        syntheticChannelTelemetry.emitSessionTelemetry();
-        syntheticStatusTelemetry.emitSessionTelemetry();
-        userActivityTelemetry.emitSessionTelemetry();
-        syntheticAiBotTelemetry.emitSessionTelemetry();
-        syntheticContactsTelemetry.emitSessionTelemetry();
-        syntheticCrashTelemetry.emitSessionTelemetry();
-        voiceNoteTelemetry.emitSessionTelemetry();
-        syntheticCallTelemetry.emitSessionTelemetry();
+        syntheticTelemetryHub.emitAll();
+        var connEvent = new CobaltConnectionEvent();
+        connEvent.transport = "linked";
+        connEvent.action = "opened";
+        connEvent.reason = "connected";
+        connEvent.success = true;
+        connEvent.commit();
     }
 
     /**
@@ -3476,7 +3188,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_ADDED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
-        var mutation = quickReplyMutationFactory.getQuickReplyAddOrEditMutation(
+        var mutation = mutationFactories.quickReply().getQuickReplyAddOrEditMutation(
                 quickReplyId, shortcut, message, 0, resolvedKeywords, timestamp);
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
         // Cobalt updates the store eagerly for consistent read-after-write semantics.
@@ -3511,7 +3223,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_EDITED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
-        var mutation = quickReplyMutationFactory.getQuickReplyAddOrEditMutation(
+        var mutation = mutationFactories.quickReply().getQuickReplyAddOrEditMutation(
                 quickReplyId, shortcut, message, currentCount, resolvedKeywords, timestamp);
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
         var entry = new QuickReplyBuilder()
@@ -3539,7 +3251,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .quickReplyAction(com.github.auties00.cobalt.wire.wam.type.QuickReplyAction.ACTION_SETTINGS_DELETED)
                 .quickReplyEntryPoint(QuickReplyEntryPoint.QUICK_REPLY_ENTRY_POINT_SETTINGS_MENU)
                 .build());
-        var mutation = quickReplyMutationFactory.getQuickReplyDeleteMutation(quickReplyId, Instant.now());
+        var mutation = mutationFactories.quickReply().getQuickReplyDeleteMutation(quickReplyId, Instant.now());
         webAppStateService.pushPatches(QuickReplyAction.COLLECTION_NAME, List.of(mutation));
         store.settingsStore().removeQuickReply(quickReplyId);
         return existing;
@@ -8112,7 +7824,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void editName(String newPushName) {
         Objects.requireNonNull(newPushName, "newPushName cannot be null");
-        var mutation = pushNameSettingMutationFactory.getPushnameMutation(Instant.now(), newPushName);
+        var mutation = mutationFactories.pushNameSetting().getPushnameMutation(Instant.now(), newPushName);
         webAppStateService.pushPatches(PushNameSetting.COLLECTION_NAME, List.of(mutation));
         var request = new SmaxAvailabilityRequest(null, newPushName);
         sendNodeWithNoResponse(request.toStanza().build());
@@ -9820,7 +9532,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                     case WHITELIST -> StatusPrivacyAction.StatusDistributionMode.ALLOW_LIST;
                     case CONTACTS_EXCEPT -> StatusPrivacyAction.StatusDistributionMode.DENY_LIST;
                 };
-                var mutation = statusPrivacyMutationFactory.getStatusPrivacyMutation(Instant.now(), protoMode, jidList);
+                var mutation = mutationFactories.statusPrivacy().getStatusPrivacyMutation(Instant.now(), protoMode, jidList);
                 webAppStateService.pushPatches(
                         StatusPrivacyAction.COLLECTION_NAME,
                         List.of(mutation));
@@ -10346,7 +10058,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var timestamp = Instant.now();
         var chatModel = store.chatStore().findChatByJid(chat).orElse(null);
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null;
-        var mutations = archiveChatMutationFactory.getMutationsForArchive(timestamp, archive, chat, messageRange);
+        var mutations = mutationFactories.archiveChat().getMutationsForArchive(timestamp, archive, chat, messageRange);
         webAppStateService.pushPatches(ArchiveChatAction.COLLECTION_NAME, mutations);
         if (chatModel != null) {
             chatModel.setArchived(archive);
@@ -10398,7 +10110,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             }
         });
         if (pin) {
-            pinChatMutationFactory.emitPinnedChats(this, chat);
+            mutationFactories.pinChat().emitPinnedChats(this, chat);
         }
     }
 
@@ -10409,7 +10121,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void muteChat(JidProvider chatProvider, Instant muteUntil) {
         var chat = Objects.requireNonNull(chatProvider, "chat cannot be null").toJid();
         var muteEndSeconds = muteUntil == null ? 0L : muteUntil.getEpochSecond();
-        var mutation = muteChatMutationFactory.generateMuteMutation(this, chat, muteEndSeconds, null);
+        var mutation = mutationFactories.muteChat().generateMuteMutation(this, chat, muteEndSeconds, null);
         webAppStateService.pushPatches(MuteAction.COLLECTION_NAME, List.of(mutation));
         store.chatStore().findChatByJid(chat).ifPresent(chatModel ->                chatModel.setMute(ChatMute.mutedUntil(muteEndSeconds)));
         // Newsletters in Cobalt use the dedicated #muteNewsletter(Jid, boolean) API and never reach this method.
@@ -10492,7 +10204,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var timestamp = Instant.now();
         var chatModel = store.chatStore().findChatByJid(chat).orElse(null);
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null;
-        var mutation = markChatAsReadMutationFactory.getMarkChatAsReadMutation(timestamp, read, chat, messageRange);
+        var mutation = mutationFactories.markChatAsRead().getMarkChatAsReadMutation(timestamp, read, chat, messageRange);
         webAppStateService.pushPatches(MarkChatAsReadAction.COLLECTION_NAME, List.of(mutation));
         if (chatModel != null) {
             if (read) {
@@ -10523,7 +10235,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         ? MdFeatureCode.CLEAR_CHAT_REMOVE_STARRED_MUTATION
                         : MdFeatureCode.CLEAR_CHAT_KEEP_STARRED_MUTATION)
                 .build());
-        var mutation = clearChatMutationFactory.getClearChatMutation(timestamp, chat, !keepStarred, false, messageRange);
+        var mutation = mutationFactories.clearChat().getClearChatMutation(timestamp, chat, !keepStarred, false, messageRange);
         webAppStateService.pushPatches(ClearChatAction.COLLECTION_NAME, List.of(mutation));
         if (chatModel != null) {
             // TODO: per-message range deletion is not yet supported; Cobalt drops all messages on clearChat
@@ -10550,7 +10262,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                 .mdSyncdDogfoodingFeature(MdFeatureCode.DELETE_MUTATION)
                 .build());
-        var mutation = deleteChatMutationFactory.getDeleteChatMutation(timestamp, chat, false, messageRange);
+        var mutation = mutationFactories.deleteChat().getDeleteChatMutation(timestamp, chat, false, messageRange);
         webAppStateService.pushPatches(DeleteChatAction.COLLECTION_NAME, List.of(mutation));
         store.chatStore().removeChat(chatModel);
         return Optional.of(chatModel);
@@ -10586,7 +10298,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var timestamp = Instant.now();
         var chatModel = store.chatStore().findChatByJid(chat).orElse(null);
         var messageRange = chatModel != null ? buildOutgoingMessageRange(chatModel) : null;
-        var mutations = lockChatMutationFactory.getMutationsForLock(timestamp, locked, chat, messageRange);
+        var mutations = mutationFactories.lockChat().getMutationsForLock(timestamp, locked, chat, messageRange);
         webAppStateService.pushPatches(LockChatAction.COLLECTION_NAME, mutations);
         if (chatModel != null) {
             chatModel.setLocked(locked);
@@ -10623,7 +10335,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .boxed()
                 .findFirst()
                 .orElse(null);
-        var mutation = labelEditMutationFactory.getLabelMutation(                labelId,
+        var mutation = mutationFactories.labelEdit().getLabelMutation(                labelId,
                 name,
                 colorIndex,
                 false,                predefinedLabelId,                Boolean.TRUE,
@@ -10671,7 +10383,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 : null;
         var type = existing.type().orElse(null);
         var isActive = existing.isActive().orElse(Boolean.FALSE);
-        var mutation = labelEditMutationFactory.getLabelMutation(                labelId,
+        var mutation = mutationFactories.labelEdit().getLabelMutation(                labelId,
                 name,
                 colorIndex,
                 false,                predefinedId,
@@ -10723,7 +10435,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         var timestamp = Instant.now();
         var mutations = new ArrayList<SyncPendingMutation>();
-        mutations.add(labelEditMutationFactory.getLabelMutation(                labelId,
+        mutations.add(mutationFactories.labelEdit().getLabelMutation(                labelId,
                 existing.name(),
                 existing.color(),
                 true,
@@ -10733,7 +10445,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 timestamp
         ));
         for (var assignment : existing.assignments()) {
-            mutations.add(labelAssociationMutationFactory.createLabelAssociationMutation(
+            mutations.add(mutationFactories.labelAssociation().createLabelAssociationMutation(
                     labelId,
                     assignment,
                     false,                    timestamp
@@ -10783,7 +10495,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             } catch (NumberFormatException _) {
             }
         }
-        var mutation = labelReorderingMutationFactory.getReorderLabelsMutation(intIds, timestamp);
+        var mutation = mutationFactories.labelReordering().getReorderLabelsMutation(intIds, timestamp);
         webAppStateService.pushPatches(LabelReorderingAction.COLLECTION_NAME, List.of(mutation));
         for (var position = 0; position < labelIds.size(); position++) {
             var id = labelIds.get(position);
@@ -10884,7 +10596,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void pushLabelAssociationMutation(String labelId, Jid target, boolean labeled) {
         var timestamp = Instant.now();
-        var mutation = labelAssociationMutationFactory.createLabelAssociationMutation(
+        var mutation = mutationFactories.labelAssociation().createLabelAssociationMutation(
                 labelId,
                 target,
                 labeled,
@@ -10921,7 +10633,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var listId = String.valueOf(nextId);
         var listJid = Jid.of(listId, JidServer.broadcast());
         var participants = buildBroadcastParticipants(recipients);
-        var mutation = businessBroadcastListMutationFactory.getBroadcastListMutation(
+        var mutation = mutationFactories.businessBroadcastList().getBroadcastListMutation(
                 listId,
                 participants,
                 name,
@@ -10948,7 +10660,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var timestamp = Instant.now();
         var listId = broadcastListId.user();
         var participants = buildBroadcastParticipants(newRecipients);
-        var mutation = businessBroadcastListMutationFactory.getBroadcastListMutation(
+        var mutation = mutationFactories.businessBroadcastList().getBroadcastListMutation(
                 listId,
                 participants,
                 newName,
@@ -10970,7 +10682,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var broadcastListId = Objects.requireNonNull(broadcastListIdProvider, "broadcastListId cannot be null").toJid();
         var timestamp = Instant.now();
         var listId = broadcastListId.user();
-        var mutation = businessBroadcastListMutationFactory.getDeleteBroadcastListMutation(listId, timestamp);
+        var mutation = mutationFactories.businessBroadcastList().getDeleteBroadcastListMutation(listId, timestamp);
         webAppStateService.pushPatches(BusinessBroadcastListAction.COLLECTION_NAME, List.of(mutation));
         store.businessStore().removeBusinessBroadcastList(listId);
     }
@@ -11058,7 +10770,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var existingAssignment = store.businessStore().findChatAssignment(chat).orElse(null);
         var hadPreviousAssignment = existingAssignment != null && existingAssignment.agentId().isPresent();
         var timestamp = Instant.now();
-        var mutation = chatAssignmentMutationFactory.createChatAssignmentMutation(
+        var mutation = mutationFactories.chatAssignment().createChatAssignmentMutation(
                 chat,
                 agentId,
                 timestamp
@@ -11206,7 +10918,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             throw new IllegalStateException("Chat " + chat + " has no current agent assignment");
         }
         var timestamp = Instant.now();
-        var mutation = chatAssignmentOpenedStatusMutationFactory.createChatOpenedMutation(
+        var mutation = mutationFactories.chatAssignmentOpenedStatus().createChatOpenedMutation(
                 chat,
                 agentId,
                 opened,
@@ -13086,7 +12798,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void favoriteSticker(String stickerHash) {
         Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
-        var mutation = favoriteStickerMutationFactory.getFavoriteStickerMutation(stickerHash, true);
+        var mutation = mutationFactories.favoriteSticker().getFavoriteStickerMutation(stickerHash, true);
         webAppStateService.pushPatches(StickerAction.COLLECTION_NAME, List.of(mutation));
         emitStickerAddToFavoriteEvent();
     }
@@ -13097,7 +12809,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void unfavoriteSticker(String stickerHash) {
         Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
-        var mutation = favoriteStickerMutationFactory.getFavoriteStickerMutation(stickerHash, false);
+        var mutation = mutationFactories.favoriteSticker().getFavoriteStickerMutation(stickerHash, false);
         webAppStateService.pushPatches(StickerAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -13107,7 +12819,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void removeRecentSticker(String stickerHash) {
         Objects.requireNonNull(stickerHash, "stickerHash cannot be null");
-        var mutation = removeRecentStickerMutationFactory.getRemoveRecentStickerMutation(stickerHash);
+        var mutation = mutationFactories.removeRecentSticker().getRemoveRecentStickerMutation(stickerHash);
         webAppStateService.pushPatches(RemoveRecentStickerAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -13427,7 +13139,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void sendBotWelcomeRequest(JidProvider botJidProvider) {
         var botJid = Objects.requireNonNull(botJidProvider, "botJid cannot be null").toJid();
-        var mutation = botWelcomeRequestMutationFactory.getBotWelcomeRequestSetMutation(botJid, true);
+        var mutation = mutationFactories.botWelcomeRequest().getBotWelcomeRequestSetMutation(botJid, true);
         webAppStateService.pushPatches(BotWelcomeRequestAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -13443,7 +13155,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             throw new IllegalArgumentException("newName cannot be blank");
         }
         var jid = Jid.of(chatJid);
-        var mutation = aiThreadRenameMutationFactory.getAiThreadRenameMutation(jid, threadId, newName);
+        var mutation = mutationFactories.aiThreadRename().getAiThreadRenameMutation(jid, threadId, newName);
         webAppStateService.pushPatches(AiThreadRenameAction.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder().threadId(chatJid + "|" + threadId).title(newName).build());
@@ -13457,7 +13169,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(chatJid, "chatJid cannot be null");
         Objects.requireNonNull(threadId, "threadId cannot be null");
         var jid = Jid.of(chatJid);
-        var mutation = aiThreadDeleteMutationFactory.getAiThreadDeleteMutation(jid, threadId);
+        var mutation = mutationFactories.aiThreadDelete().getAiThreadDeleteMutation(jid, threadId);
         webAppStateService.pushPatches(AiThreadDeleteHandler.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.businessStore().removeAiThreadTitle(chatJid + "|" + threadId);
@@ -13474,7 +13186,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!current.contains(chat)) {
             current.add(chat);
         }
-        var mutation = favoritesMutationFactory.getFavoritesMutation(current, Instant.now());
+        var mutation = mutationFactories.favorites().getFavoritesMutation(current, Instant.now());
         webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.chatStore().setFavoriteChats(current);
@@ -13490,7 +13202,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var before = List.copyOf(store.chatStore().favoriteChats());
         var current = new ArrayList<>(store.chatStore().favoriteChats());
         current.remove(chat);
-        var mutation = favoritesMutationFactory.getFavoritesMutation(current, Instant.now());
+        var mutation = mutationFactories.favorites().getFavoritesMutation(current, Instant.now());
         webAppStateService.pushPatches(FavoritesAction.COLLECTION_NAME, List.of(mutation));
         store.chatStore().setFavoriteChats(current);
         emitMessagingFavoritesUpdateEvent(before, current);
@@ -13504,7 +13216,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var chat = Objects.requireNonNull(chatProvider, "chat cannot be null").toJid();
         Objects.requireNonNull(noteText, "noteText cannot be null");
         var noteId = UUID.randomUUID().toString();
-        var mutation = noteEditMutationFactory.getNoteEditMutation(noteId, chat, noteText, false);
+        var mutation = mutationFactories.noteEdit().getNoteEditMutation(noteId, chat, noteText, false);
         webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
         return noteId;
     }
@@ -13517,7 +13229,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var chat = Objects.requireNonNull(chatProvider, "chat cannot be null").toJid();
         Objects.requireNonNull(noteId, "noteId cannot be null");
         Objects.requireNonNull(newText, "newText cannot be null");
-        var mutation = noteEditMutationFactory.getNoteEditMutation(noteId, chat, newText, false);
+        var mutation = mutationFactories.noteEdit().getNoteEditMutation(noteId, chat, newText, false);
         webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -13528,7 +13240,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void deleteNoteFromChat(JidProvider chatProvider, String noteId) {
         var chat = Objects.requireNonNull(chatProvider, "chat cannot be null").toJid();
         Objects.requireNonNull(noteId, "noteId cannot be null");
-        var mutation = noteEditMutationFactory.getNoteEditMutation(noteId, chat, "", true);
+        var mutation = mutationFactories.noteEdit().getNoteEditMutation(noteId, chat, "", true);
         webAppStateService.pushPatches(NoteEditAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -13725,7 +13437,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void editLocale(String locale) {
         Objects.requireNonNull(locale, "locale cannot be null");
-        var mutation = localeSettingMutationFactory.getLocaleMutation(Instant.now(), locale);
+        var mutation = mutationFactories.localeSetting().getLocaleMutation(Instant.now(), locale);
         webAppStateService.pushPatches(LocaleSetting.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.accountStore().setLocale(locale);
@@ -13755,7 +13467,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setLinkPreviewsDisabled(boolean disabled) {
-        var mutation = disableLinkPreviewsMutationFactory.getDisableLinkPreviewsMutation(Instant.now(), disabled);
+        var mutation = mutationFactories.disableLinkPreviews().getDisableLinkPreviewsMutation(Instant.now(), disabled);
         webAppStateService.pushPatches(PrivacySettingDisableLinkPreviewsAction.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.settingsStore().setDisableLinkPreviews(disabled);
@@ -13786,7 +13498,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setTwentyFourHourFormat(boolean twentyFourHourFormat) {
-        var mutation = timeFormatMutationFactory.getTimeFormatMutation(Instant.now(), twentyFourHourFormat);
+        var mutation = mutationFactories.timeFormat().getTimeFormatMutation(Instant.now(), twentyFourHourFormat);
         webAppStateService.pushPatches(TimeFormatAction.COLLECTION_NAME, List.of(mutation));
         // Apply locally for eager consistency
         store.settingsStore().setTwentyFourHourFormat(twentyFourHourFormat);
@@ -13815,7 +13527,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var status = enabled
                 ? MaibaAIFeaturesControlAction.MaibaAIFeatureStatus.ENABLED
                 : MaibaAIFeaturesControlAction.MaibaAIFeatureStatus.DISABLED;
-        var mutation = maibaAIFeaturesControlMutationFactory.getMaibaAiFeatureStatusMutation(Instant.now(), status); // NO_WA_BASIS
+        var mutation = mutationFactories.maibaAIFeaturesControl().getMaibaAiFeatureStatusMutation(Instant.now(), status); // NO_WA_BASIS
         webAppStateService.pushPatches(MaibaAIFeaturesControlAction.COLLECTION_NAME, List.of(mutation));
         store.businessStore().setAiBusinessAgentStatus(status); // NO_WA_BASIS: apply locally for eager consistency
     }
@@ -13844,7 +13556,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setUnarchiveChatsOnNewMessage(boolean unarchive) {
-        var mutation = unarchiveChatsSettingMutationFactory.getUnarchiveChatsMutation(Instant.now(), unarchive);
+        var mutation = mutationFactories.unarchiveChatsSetting().getUnarchiveChatsMutation(Instant.now(), unarchive);
         webAppStateService.pushPatches(UnarchiveChatsSetting.COLLECTION_NAME, List.of(mutation));
         store.settingsStore().setUnarchiveChats(unarchive);
     }
@@ -13853,7 +13565,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void editNotificationActivity(NotificationActivitySettingAction.NotificationActivitySetting setting) {
         Objects.requireNonNull(setting, "setting cannot be null");
-        var mutation = notificationActivitySettingMutationFactory.getNotificationActivityMutation(Instant.now(), setting); // NO_WA_BASIS
+        var mutation = mutationFactories.notificationActivitySetting().getNotificationActivityMutation(Instant.now(), setting); // NO_WA_BASIS
         webAppStateService.pushPatches(SyncPatchType.REGULAR, List.of(mutation));
         store.settingsStore().setNotificationActivitySetting(setting); // NO_WA_BASIS: apply locally for eager consistency
     }
@@ -18071,7 +17783,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             return;
         }
 
-        var mutation = externalWebBetaMutationFactory.getExternalWebBetaMutation(enrolled);
+        var mutation = mutationFactories.externalWebBeta().getExternalWebBetaMutation(enrolled);
         webAppStateService.pushPatches(ExternalWebBetaAction.COLLECTION_NAME, List.of(mutation));
         store.syncStore().setExternalWebBeta(enrolled);
         store.accountStore().setReleaseChannel(enrolled ? ClientPayload.ClientReleaseChannel.BETA : ClientPayload.ClientReleaseChannel.RELEASE);
@@ -18102,7 +17814,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setAlwaysRelayCalls(boolean enabled) {
-        var mutation = voipRelayAllCallsMutationFactory.getVoipRelayAllCallsMutation(Instant.now(), enabled);
+        var mutation = mutationFactories.voipRelayAllCalls().getVoipRelayAllCallsMutation(Instant.now(), enabled);
         webAppStateService.pushPatches(PrivacySettingRelayAllCalls.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18130,7 +17842,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setAiPrivateProcessing(boolean enabled) {
-        var mutation = privateProcessingSettingMutationFactory.getPrivateProcessingMutation(enabled);
+        var mutation = mutationFactories.privateProcessingSetting().getPrivateProcessingMutation(enabled);
         webAppStateService.pushPatches(PrivateProcessingSettingAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18161,7 +17873,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setAutomatedDetections(boolean enabled) {
-        var mutation = detectedOutcomesStatusMutationFactory.getDetectedOutcomesStatusMutation(enabled);
+        var mutation = mutationFactories.detectedOutcomesStatus().getDetectedOutcomesStatusMutation(enabled);
         webAppStateService.pushPatches(DetectedOutcomesStatusAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18171,7 +17883,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void dismissOnboardingHint(String hintId) {
         Objects.requireNonNull(hintId, "hintId cannot be null");
-        var mutation = nuxActionMutationFactory.getNuxMutation(hintId, Instant.now(), true);
+        var mutation = mutationFactories.nuxAction().getNuxMutation(hintId, Instant.now(), true);
         webAppStateService.pushPatches(NuxAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18181,7 +17893,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void restoreOnboardingHint(String hintId) {
         Objects.requireNonNull(hintId, "hintId cannot be null");
-        var mutation = nuxActionMutationFactory.getNuxMutation(hintId, Instant.now(), false);
+        var mutation = mutationFactories.nuxAction().getNuxMutation(hintId, Instant.now(), false);
         webAppStateService.pushPatches(NuxAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18191,7 +17903,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void disableInteractiveMessageButton(String buttonId) {
         Objects.requireNonNull(buttonId, "buttonId cannot be null");
-        var mutation = interactiveMessageMutationFactory.getDisableButtonMutation(buttonId);
+        var mutation = mutationFactories.interactiveMessage().getDisableButtonMutation(buttonId);
         webAppStateService.pushPatches(InteractiveMessageAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18201,7 +17913,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void editRecentEmojiUsage(List<RecentEmojiWeight> usage) {
         Objects.requireNonNull(usage, "usage cannot be null");
-        var mutation = recentEmojiWeightsMutationFactory.getRecentEmojiWeightsMutation(usage);
+        var mutation = mutationFactories.recentEmojiWeights().getRecentEmojiWeightsMutation(usage);
         webAppStateService.pushPatches(RecentEmojiWeightsAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18211,7 +17923,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void editContact(ContactEdit edit) {
         Objects.requireNonNull(edit, "edit cannot be null");
-        var mutation = contactActionMutationFactory.getContactSyncMutation(
+        var mutation = mutationFactories.contactAction().getContactSyncMutation(
                 edit.contact(),
                 edit.firstName().orElse(null),
                 edit.fullName().orElse(null),
@@ -18228,7 +17940,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void deleteContact(JidProvider contact) {
         Objects.requireNonNull(contact, "contact cannot be null");
-        var mutation = contactActionMutationFactory.getContactSyncMutation(
+        var mutation = mutationFactories.contactAction().getContactSyncMutation(
                 contact.toJid(), null, null, true, null, null, null);
         webAppStateService.pushPatches(ContactAction.COLLECTION_NAME, List.of(mutation));
     }
@@ -18244,7 +17956,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var callerJid = entry.callCreatorJid()
                 .orElseThrow(() -> new IllegalArgumentException("entry must carry a callCreatorJid"));
         var fromMe = !entry.isIncoming();
-        var mutation = callLogMutationFactory.getCallLogMutation(Instant.now(), callerJid, callId, fromMe, entry);
+        var mutation = mutationFactories.callLog().getCallLogMutation(Instant.now(), callerJid, callId, fromMe, entry);
         webAppStateService.pushPatches(CallLogAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18276,7 +17988,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private void setAdvertiserDataSharing(Jid customer, boolean enabled) {
         Objects.requireNonNull(customer, "customer cannot be null");
-        var mutation = ctwaPerCustomerDataSharingMutationFactory.getCtwaPerCustomerDataSharingMutation(customer, enabled);
+        var mutation = mutationFactories.ctwaPerCustomerDataSharing().getCtwaPerCustomerDataSharingMutation(customer, enabled);
         webAppStateService.pushPatches(CtwaPerCustomerDataSharingAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18290,7 +18002,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var action = new CustomPaymentMethodsActionBuilder()
                 .customPaymentMethods(methods)
                 .build();
-        var mutation = customPaymentMethodsMutationFactory.getCustomPaymentMethodSetMutation(action);
+        var mutation = mutationFactories.customPaymentMethods().getCustomPaymentMethodSetMutation(action);
         webAppStateService.pushPatches(CustomPaymentMethodsAction.COLLECTION_NAME, List.of(mutation));
     }
 
@@ -18324,7 +18036,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .paymentNotice(notice)
                 .accepted(accepted)
                 .build();
-        var mutation = paymentTosMutationFactory.getPaymentTosSetMutation(action);
+        var mutation = mutationFactories.paymentTos().getPaymentTosSetMutation(action);
         webAppStateService.pushPatches(PaymentTosAction.COLLECTION_NAME, List.of(mutation));
     }
 

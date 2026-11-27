@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build and run unit tests
+        run: ./mvnw -B verify -Dtest='!PlayStoreUtilsTest,!WhatsAppSslContextFactoryTest' -DfailIfNoTests=false
+
+      - name: Verify Javadoc references
+        continue-on-error: true
+        run: ./mvnw -B -Pjavadoc-check -fae compile javadoc:javadoc-no-fork -DskipTests
