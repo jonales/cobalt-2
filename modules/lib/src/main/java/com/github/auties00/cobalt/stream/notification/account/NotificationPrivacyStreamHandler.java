@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.wire.core.jid.Jid;
 import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Handles {@code type="privacy_token"} notifications carrying server-issued trusted-contact tokens (TC
@@ -85,8 +87,8 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
     }
 
     /**
-     * Reads the sender PN and optional sender LID, waits for the offline delivery window to end, then
-     * iterates each {@code <token>} child by type.
+     * Reads the sender PN and optional sender LID and, once the offline delivery window ends (see
+     * {@link #runAfterOfflineDelivery}), applies each {@code <token>} child by type.
      *
      * <p>The offline-delivery barrier ensures the per-chat record exists before a TC token is applied to
      * it. Each {@code <token>} child is dispatched on its {@code type} attribute; the only recognised
@@ -111,9 +113,47 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
             return;
         }
 
-        whatsapp.store().connectionStore().waitForOfflineDeliveryEnd();
+        var connectionStore = whatsapp.store().connectionStore();
+        var tokens = List.copyOf(tokensNode.getChildren("token"));
+        runAfterOfflineDelivery(
+                connectionStore.offlineResumeState() == LinkedWhatsAppClientOfflineResumeState.COMPLETE,
+                connectionStore::waitForOfflineDeliveryEnd,
+                "privacy-token-" + senderPn,
+                () -> applyTokens(senderPn, senderLid, tokens));
+    }
 
-        for (var tokenNode : tokensNode.getChildren("token")) {
+    /**
+     * Runs {@code apply} now when the offline delivery already ended, or on a virtual thread that first waits
+     * for its end.
+     *
+     * <p>The wait must never run on the stanza thread: the ACK of this notification goes out only after
+     * {@link #handle(Stanza)} returns, and the server holds the rest of the offline backlog (including the
+     * {@code <offline/>} marker that ends the wait) until it receives the ACKs of what it already delivered.
+     * Waiting inline deadlocked each batch of {@code privacy_token} notifications until the five-minute
+     * timeout of {@code waitForOfflineDeliveryEnd}.</p>
+     *
+     * @param offlineComplete whether the offline delivery already ended
+     * @param waitForEnd      blocks until the offline delivery ends (or its timeout)
+     * @param threadName      the name of the virtual thread that waits
+     * @param apply           the work that needs the offline delivery to be over
+     */
+    static void runAfterOfflineDelivery(boolean offlineComplete, Runnable waitForEnd, String threadName, Runnable apply) {
+        if (offlineComplete) {
+            apply.run();
+            return;
+        }
+        Thread.ofVirtual().name(threadName).start(() -> {
+            try {
+                waitForEnd.run();
+                apply.run();
+            } catch (Throwable throwable) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot apply privacy tokens after the offline delivery", throwable);
+            }
+        });
+    }
+
+    private void applyTokens(Jid senderPn, Jid senderLid, List<Stanza> tokens) {
+        for (var tokenNode : tokens) {
             var type = tokenNode.getAttributeAsString("type", "");
             switch (type) {
                 case "trusted_contact" -> handleTrustedContactToken(senderPn, senderLid, tokenNode);
